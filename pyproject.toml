@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jarvis-assistant"
+version = "0.4.0"
+description = "An original, local-first personal voice assistant."
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "keyring>=25,<27",
+]
+
+[project.optional-dependencies]
+sherpa = [
+  "sherpa-onnx>=1.13,<2",
+]
+kokoro = [
+  "kokoro>=0.9.4,<1",
+  "misaki[zh]",
+  "numpy>=1.26",
+  "soundfile>=0.12",
+]
+stt = [
+  "faster-whisper>=1.1,<2",
+]
+desktop = [
+  "pywebview>=5,<7",
+  "Pillow>=11,<13",
+]
+voice = [
+  "sherpa-onnx>=1.13,<2",
+  "faster-whisper>=1.1,<2",
+]
+voice-full = [
+  "sherpa-onnx>=1.13,<2",
+  "faster-whisper>=1.1,<2",
+  "kokoro>=0.9.4,<1",
+  "misaki[zh]",
+  "numpy>=1.26",
+  "soundfile>=0.12",
+]
+
+[tool.setuptools]
+packages = ["jarvis"]
+
+[tool.setuptools.package-data]
+jarvis = ["static/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

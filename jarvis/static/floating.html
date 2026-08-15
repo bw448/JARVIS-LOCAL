@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="color-scheme" content="dark">
+  <title>JARVIS HUD</title>
+  <link rel="stylesheet" href="/static/floating.css">
+</head>
+<body data-state="idle" data-theme="cyan" data-edge="right" data-collapsed="false" data-active="false" data-voice-mode="false">
+  <main id="widget-shell" class="hud-shell" aria-label="JARVIS 悬浮助手">
+    <div class="ambient-glow" aria-hidden="true"></div>
+
+    <section class="jarvis-orb" aria-label="贾维斯圆形 HUD">
+      <canvas id="hud-emblem" class="hud-emblem" width="376" height="376" aria-hidden="true"></canvas>
+      <span class="hud-rotor rotor-a" aria-hidden="true"></span>
+      <span class="hud-rotor rotor-b" aria-hidden="true"></span>
+      <span class="hud-sweep" aria-hidden="true"></span>
+      <span class="hud-crosshair" aria-hidden="true"></span>
+      <span class="amber-beacon" aria-hidden="true"><i></i><i></i><i></i></span>
+
+      <div id="widget-drag-handle" class="hud-drag pywebview-drag-region" title="拖动并自动吸附屏幕边缘"></div>
+
+      <button id="float-action" class="hud-core no-drag" type="button" aria-label="开启连续语音模式" aria-pressed="false">
+        <span class="core-reticle" aria-hidden="true"></span>
+        <strong id="float-monogram" class="hud-name">JARVIS</strong>
+        <span class="float-wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+        <span id="float-status-label" class="core-status">系统待命</span>
+        <span id="float-mode-label" class="core-mode">点击核心开始对话</span>
+      </button>
+
+      <button id="float-hide" class="orbit-control control-close no-drag" type="button" title="隐藏悬浮助手" aria-label="隐藏悬浮助手">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg>
+      </button>
+      <button id="float-expand" class="orbit-control control-panel no-drag" type="button" title="打开主面板" aria-label="打开主面板">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4H4v4M16 4h4v4M8 20H4v-4M16 20h4v-4"/></svg>
+      </button>
+    </section>
+
+    <button id="edge-rail" class="edge-rail no-drag" type="button" aria-label="展开悬浮助手">
+      <span class="edge-pulse" aria-hidden="true"></span>
+      <span class="edge-chevrons" aria-hidden="true"><i></i><i></i></span>
+      <span class="sr-only">展开悬浮助手</span>
+    </button>
+  </main>
+  <script src="/static/floating.js" defer></script>
+</body>
+</html>

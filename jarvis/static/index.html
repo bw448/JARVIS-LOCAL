@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="cyan">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#071116">
+  <title>JARVIS LOCAL</title>
+  <link rel="icon" href="/static/jarvis-hud-logo.png" type="image/png">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body data-voice-state="idle" data-voice-mode="false">
+  <div class="backdrop" aria-hidden="true">
+    <div class="backdrop-noise"></div>
+    <div class="backdrop-radar"></div>
+    <div class="backdrop-line line-a"></div>
+    <div class="backdrop-line line-b"></div>
+  </div>
+
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="JARVIS LOCAL 首页">
+        <span class="brand-mark"><img src="/static/jarvis-hud-logo.png" alt=""></span>
+        <span class="brand-copy">
+          <strong id="product-name">JARVIS LOCAL</strong>
+          <small>PRIVATE SIGNAL DESK <span id="app-version">0.4.0</span></small>
+        </span>
+      </a>
+
+      <div class="topbar-actions">
+        <div id="system-status" class="status-chip" data-state="loading">
+          <span class="status-beacon" aria-hidden="true"></span>
+          <span class="status-copy">正在检测系统</span>
+        </div>
+        <button id="voice-mode-button" class="mode-button" type="button" aria-pressed="false">
+          <span class="mode-button-orb" aria-hidden="true"></span>
+          <span><strong>语音模式</strong><small>免点击连续对话</small></span>
+        </button>
+        <button id="clear-chat-button" class="square-button" type="button" title="清空当前对话" aria-label="清空当前对话">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5"/></svg>
+        </button>
+        <button id="open-settings-button" class="square-button" type="button" title="打开设置" aria-label="打开设置">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z"/><path d="m19 13.5 1.5 1.2-2 3.5-1.9-.7a7.5 7.5 0 0 1-2.1 1.2l-.3 2h-4l-.3-2a7.5 7.5 0 0 1-2.1-1.2l-1.9.7-2-3.5L5.5 13a7.5 7.5 0 0 1 0-2.4L4 9.3l2-3.5 1.9.7A7.5 7.5 0 0 1 10 5.3l.3-2h4l.3 2a7.5 7.5 0 0 1 2.1 1.2l1.9-.7 2 3.5-1.5 1.2a7.5 7.5 0 0 1 0 3Z"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <aside class="voice-panel panel">
+        <div class="panel-kicker">
+          <span>VOICE CORE / 01</span>
+          <span class="local-badge">100% LOCAL VOICE</span>
+        </div>
+
+        <div id="voice-core" class="signal-core" data-state="idle" aria-hidden="true">
+          <div class="signal-frame frame-one"></div>
+          <div class="signal-frame frame-two"></div>
+          <div class="signal-grid"></div>
+          <div class="signal-sweep"></div>
+          <div class="signal-bars">
+            <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+          </div>
+          <div class="signal-monogram" id="core-monogram">J</div>
+          <span class="signal-corner corner-a"></span>
+          <span class="signal-corner corner-b"></span>
+        </div>
+
+        <div class="voice-state-copy">
+          <p id="voice-state-label">待命</p>
+          <span id="voice-state-detail">可以输入文字，或开启连续语音</span>
+        </div>
+
+        <button id="voice-mode-card-button" class="voice-mode-card" type="button" aria-pressed="false">
+          <span class="voice-mode-icon" aria-hidden="true">
+            <i></i><i></i><i></i>
+          </span>
+          <span><strong>开启连续语音</strong><small>说完自动识别、发送并等待下一句话</small></span>
+          <span class="voice-mode-switch" aria-hidden="true"><i></i></span>
+        </button>
+
+        <div class="voice-controls">
+          <button id="microphone-button" class="listen-button" type="button" aria-label="开始单次语音输入" aria-pressed="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Z"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3M9 21h6"/></svg>
+            <span>单次说话</span>
+          </button>
+          <button id="stop-speech-button" class="stop-button" type="button" aria-label="停止朗读">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 8h8v8H8z"/></svg>
+            <span>静音</span>
+          </button>
+        </div>
+
+        <div id="recording-banner" class="recording-banner" hidden>
+          <span class="recording-dot" aria-hidden="true"></span>
+          <span>麦克风只连接本机识别</span>
+          <time id="recording-time">00:00</time>
+        </div>
+
+        <div class="identity-card">
+          <div>
+            <span class="micro-label">ACTIVE IDENTITY</span>
+            <h1 id="assistant-name">JARVIS</h1>
+            <p id="owner-line">为先生服务</p>
+          </div>
+          <span class="identity-seal" aria-hidden="true">AI</span>
+        </div>
+
+        <div class="module-stack" aria-label="模块状态">
+          <div class="module-row">
+            <span class="module-index">AI</span>
+            <div><strong>文字思考</strong><small id="brain-status">正在检测</small></div>
+            <span id="brain-indicator" class="module-indicator"></span>
+          </div>
+          <div class="module-row">
+            <span class="module-index">IN</span>
+            <div><strong>听懂你说话</strong><small id="stt-status">正在检测</small></div>
+            <span id="stt-indicator" class="module-indicator"></span>
+          </div>
+          <div class="module-row">
+            <span class="module-index">OUT</span>
+            <div><strong>本地甜美女声</strong><small id="tts-status">正在检测</small></div>
+            <span id="tts-indicator" class="module-indicator"></span>
+          </div>
+        </div>
+      </aside>
+
+      <section class="conversation-panel panel">
+        <div class="conversation-heading">
+          <div>
+            <span class="micro-label">CONVERSATION / 02</span>
+            <h2>和 <span id="conversation-assistant-name">JARVIS</span> 对话</h2>
+          </div>
+          <div class="session-note">
+            <span class="session-lock" aria-hidden="true"></span>
+            <span>会话默认不保存</span>
+          </div>
+        </div>
+
+        <div id="message-list" class="message-list" role="log" aria-live="polite" aria-label="会话内容"></div>
+
+        <div class="composer-zone">
+          <div class="composer">
+            <textarea id="message-input" rows="1" maxlength="20000" aria-label="输入消息" placeholder="告诉 JARVIS 你要做什么…"></textarea>
+            <button id="send-button" class="send-button" type="button">
+              <span>发送</span>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 14-8-4 16-3.5-6.5L5 12Z"/><path d="m11.5 13.5 3-3"/></svg>
+            </button>
+          </div>
+          <div class="composer-meta">
+            <span>Enter 发送 · Shift+Enter 换行</span>
+            <span>语音在本机处理 · 文字由所选 API 回答</span>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <section id="voice-mode-overlay" class="voice-mode-overlay" hidden aria-label="连续语音模式">
+    <div class="voice-hud-topline">
+      <div><span class="hud-dot"></span><strong>JARVIS VOICE LINK</strong><small>LOCAL AUDIO CHANNEL</small></div>
+      <button id="voice-mode-end-button" class="hud-close" type="button">退出语音模式</button>
+    </div>
+    <div class="voice-hud-stage">
+      <div id="voice-hud-core" class="voice-hud-core" data-state="idle" aria-hidden="true">
+        <div class="hud-ring ring-outer"><i></i><i></i><i></i><i></i></div>
+        <div class="hud-ring ring-middle"></div>
+        <div class="hud-ring ring-inner"></div>
+        <div class="hud-scope"><span></span><span></span></div>
+        <div class="hud-energy"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div id="voice-hud-monogram" class="hud-monogram">J</div>
+      </div>
+      <div class="voice-hud-copy">
+        <span class="micro-label">CONTINUOUS CONVERSATION</span>
+        <h2 id="voice-hud-label">语音通道待命</h2>
+        <p id="voice-hud-detail">直接说话即可，无需点击发送</p>
+        <blockquote id="voice-live-transcript">等待你的声音…</blockquote>
+      </div>
+      <div class="voice-hud-actions">
+        <button id="voice-mode-mute-button" class="hud-action" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9v6h4l5 4V5L9 9H5Z"/><path d="m18 9 4 4M22 9l-4 4"/></svg>
+          停止当前朗读
+        </button>
+        <span>停顿后自动发送 · 回答完成后自动继续聆听</span>
+      </div>
+    </div>
+    <div class="voice-hud-footer"><span>ENCRYPTED LOCAL LOOP</span><span id="voice-level-label">INPUT 00%</span><span>NO CLOUD VOICE API</span></div>
+  </section>
+
+  <dialog id="settings-dialog" class="settings-dialog">
+    <form id="settings-form" method="dialog">
+      <header class="dialog-header">
+        <div>
+          <span class="micro-label">PERSONALIZE JARVIS</span>
+          <h2>设置</h2>
+          <p>常用项目放在前面，高级选项可以保持默认。</p>
+        </div>
+        <button id="close-settings-button" class="square-button" type="button" aria-label="关闭设置">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+        </button>
+      </header>
+
+      <div class="settings-body">
+        <section class="settings-section">
+          <div class="section-heading"><b>01</b><div><h3>称呼与性格</h3><p>让它知道自己是谁，以及应该怎样称呼你。</p></div></div>
+          <div class="field-grid two-columns">
+            <label><span>助手名字</span><input id="setting-assistant-name" maxlength="40" required placeholder="JARVIS"></label>
+            <label><span>怎样称呼你</span><input id="setting-owner-name" maxlength="40" required placeholder="先生"></label>
+          </div>
+          <label><span>回答风格</span><textarea id="setting-personality" rows="2" maxlength="500" required></textarea></label>
+        </section>
+
+        <section class="settings-section">
+          <div class="section-heading"><b>02</b><div><h3>文字模型 API</h3><p>这里只负责“思考和回答”；听与说已经在本机离线完成。</p></div></div>
+          <div class="api-explainer"><strong>只需接入一个文本模型 API</strong><span>兼容 OpenAI 格式的接口均可，Ollama 不是必需项。</span></div>
+          <div class="field-grid two-columns">
+            <label><span>智能核心</span><select id="setting-brain-provider"><option value="openai_compatible">使用文本模型 API</option><option value="disabled">暂时关闭</option></select></label>
+            <label><span>模型名称</span><input id="setting-brain-model" maxlength="160" placeholder="例如 gpt-4.1-mini"></label>
+          </div>
+          <label><span>API 地址</span><input id="setting-brain-url" type="url" maxlength="500" placeholder="https://你的服务地址/v1"></label>
+          <label><span>API 密钥</span><input id="setting-api-key" type="password" autocomplete="new-password" placeholder="留空表示不修改；仅保存到 Windows 凭据库"></label>
+          <div class="field-grid two-columns compact-grid">
+            <label class="range-field"><span>回答自由度 <output id="temperature-output">平衡 · 0.7</output></span><input id="setting-temperature" type="range" min="0" max="1.2" step="0.1"><small>越低越严谨，越高越有想象力；日常推荐 0.6～0.8。</small></label>
+            <label><span>请求超时（秒）</span><input id="setting-brain-timeout" type="number" min="10" max="600" step="1"></label>
+          </div>
+          <label class="check-row subtle-row"><input id="setting-clear-api-key" type="checkbox"><span><strong>清除已保存的密钥</strong><small id="api-key-state">当前未保存密钥</small></span></label>
+        </section>
+
+        <section class="settings-section">
+          <div class="section-heading"><b>03</b><div><h3>语音与主动交互</h3><p>选择声音、连续对话方式，以及任务完成时是否主动提醒。</p></div></div>
+          <div class="feature-callout">
+            <span class="feature-orb" aria-hidden="true"><i></i></span>
+            <div><strong>连续语音模式</strong><p>开启后直接说话。系统检测到停顿会自动识别、发送，回答结束后继续聆听。</p></div>
+          </div>
+          <div class="toggle-grid three-toggle-grid">
+            <label class="check-row"><input id="setting-voice-mode-auto-start" type="checkbox"><span><strong>启动后进入语音模式</strong><small>需要授予麦克风权限</small></span></label>
+            <label class="check-row"><input id="setting-proactive-speech" type="checkbox"><span><strong>任务完成主动提醒</strong><small>未朗读全文时播报完成提示</small></span></label>
+            <label class="check-row"><input id="setting-auto-speak" type="checkbox"><span><strong>朗读完整回答</strong><small>语音模式下始终朗读</small></span></label>
+          </div>
+          <div class="field-grid three-columns voice-primary-fields">
+            <label><span>女生音色</span><select id="setting-kokoro-voice-preset"><option value="47" data-voice="zf_xiaoxiao">晓晓 · 甜美女声（默认）</option><option value="46" data-voice="zf_xiaoni">晓妮 · 元气女声</option><option value="48" data-voice="zf_xiaoyi">晓伊 · 温柔女声</option><option value="45" data-voice="zf_xiaobei">晓北 · 清亮女声</option></select></label>
+            <label class="range-field"><span>语速 <output id="speed-output">1.0</output></span><input id="setting-tts-speed" type="range" min="0.5" max="1.5" step="0.05"></label>
+            <label class="range-field"><span>停顿后发送 <output id="silence-output">1.2 秒</output></span><input id="setting-silence-seconds" type="range" min="0.6" max="3" step="0.1"></label>
+          </div>
+          <div class="voice-test-row">
+            <button id="test-voice-button" class="secondary-button" type="button">试听当前声音</button>
+            <span id="voice-test-status">语音完全在本机生成</span>
+          </div>
+
+          <details class="advanced-settings">
+            <summary>高级语音设置</summary>
+            <div class="advanced-settings-body">
+              <div class="field-grid three-columns">
+                <label><span>语音合成引擎</span><select id="setting-tts-provider"><option value="sherpa_kokoro">Kokoro 本地多女声</option><option value="sherpa_onnx">MeloTTS 兼容模式</option><option value="system">Windows 系统语音</option><option value="kokoro">Kokoro Python</option><option value="external">外部兼容 TTS</option></select></label>
+                <label><span>本地识别引擎</span><select id="setting-stt-provider"><option value="faster_whisper">faster-whisper 本地</option><option value="disabled">关闭语音识别</option></select></label>
+                <label><span>识别模型</span><select id="setting-stt-model"><option value="tiny">tiny（最快）</option><option value="base">base</option><option value="small">small（推荐）</option><option value="medium">medium（更准确）</option></select></label>
+              </div>
+              <div id="sherpa-tts-fields" class="provider-fields">
+                <label><span>模型目录（留空使用包内模型）</span><input id="setting-tts-model-dir" maxlength="1000"></label>
+                <div class="field-grid three-columns">
+                  <label id="sherpa-vits-speaker-field" hidden><span>说话人编号</span><input id="setting-tts-speaker-id" type="number" min="0" max="100000" step="1"></label>
+                  <label><span>CPU 线程数</span><input id="setting-tts-threads" type="number" min="1" max="32" step="1"></label>
+                  <label><span>最长单次录音</span><input id="setting-recording-seconds" type="number" min="5" max="120" step="1"></label>
+                </div>
+                <p id="tts-model-hint" class="provider-hint">完整离线版会自动使用包内 Kokoro 模型。</p>
+              </div>
+              <div id="kokoro-tts-fields" class="provider-fields" hidden><label><span>Kokoro 音色</span><input id="setting-tts-voice" maxlength="120"></label></div>
+              <div id="external-tts-field" class="provider-fields" hidden>
+                <div class="field-grid two-columns"><label><span>外部语音接口</span><input id="setting-tts-url" type="url" maxlength="500"></label><label><span>服务端音色</span><input id="setting-external-voice" maxlength="120"></label></div>
+              </div>
+              <div id="stt-detail-fields" class="field-grid three-columns">
+                <label><span>识别设备</span><select id="setting-stt-device"><option value="cpu">CPU</option><option value="cuda">NVIDIA CUDA</option><option value="auto">自动</option></select></label>
+                <label><span>识别语言</span><input id="setting-stt-language" maxlength="20" placeholder="zh"></label>
+                <label class="check-row inline-check"><input id="setting-auto-send-transcript" type="checkbox"><span><strong>单次识别后直接发送</strong><small>连续语音不受此项影响</small></span></label>
+              </div>
+              <label class="check-row"><input id="setting-browser-fallback" type="checkbox"><span><strong>本地模型不可用时，允许系统语音回退</strong></span></label>
+            </div>
+          </details>
+        </section>
+
+        <section class="settings-section">
+          <div class="section-heading"><b>04</b><div><h3>外观与悬浮助手</h3><p>悬浮 HUD 默认完整显示；配色与透明度可以即时预览。</p></div></div>
+          <div class="field-grid three-columns">
+            <label><span>界面与 HUD 配色</span><select id="setting-theme"><option value="cyan">贾维斯蓝</option><option value="violet">星云紫</option><option value="emerald">矩阵绿</option><option value="amber">反应堆金</option></select></label>
+            <label class="range-field"><span>主面板透明度 <output id="opacity-output">68%</output></span><input id="setting-panel-opacity" type="range" min="0.30" max="0.96" step="0.01"></label>
+            <label class="range-field"><span>悬浮窗透明度 <output id="floating-opacity-output">85%</output></span><input id="setting-floating-opacity" type="range" min="0.25" max="1" step="0.01"></label>
+          </div>
+          <label class="check-row floating-preview-row"><input id="setting-floating-window" type="checkbox"><span><strong>显示贾维斯圆形 HUD</strong><small>启动时完整显示；拖到屏幕边缘松开后吸边收起 80%，悬停再次展开</small></span><span class="mini-widget" aria-hidden="true"><i></i><b></b></span></label>
+          <div class="privacy-note"><strong>隐私说明</strong><span>会话正文默认只在当前窗口内存中存在；API 密钥保存到 Windows 凭据管理器。</span></div>
+        </section>
+      </div>
+
+      <footer class="dialog-footer">
+        <p id="settings-message" role="status"></p>
+        <div>
+          <button id="cancel-settings-button" class="secondary-button" type="button">取消</button>
+          <button id="save-settings-button" class="primary-button" type="submit">保存并应用</button>
+        </div>
+      </footer>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <audio id="speech-player" preload="none"></audio>
+  <script src="/static/app.js" defer></script>
+</body>
+</html>

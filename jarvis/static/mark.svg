@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="JARVIS LOCAL transparent circular signal mark">
+  <defs>
+    <linearGradient id="signal" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#164f3e"/>
+      <stop offset=".48" stop-color="#238f6b"/>
+      <stop offset="1" stop-color="#43bd8d"/>
+    </linearGradient>
+    <filter id="signal-glow" x="-25%" y="-35%" width="150%" height="170%">
+      <feDropShadow dx="0" dy="1" stdDeviation="1.1" flood-color="#2b9c75" flood-opacity=".28"/>
+    </filter>
+  </defs>
+  <circle cx="32" cy="32" r="26" fill="none" stroke="#052c22" stroke-width="5.4" opacity=".48"/>
+  <circle cx="32" cy="32" r="26" fill="none" stroke="url(#signal)" stroke-width="3.4" opacity=".68" filter="url(#signal-glow)"/>
+  <circle cx="32" cy="32" r="26" fill="none" stroke="#91ddc1" stroke-width=".55" stroke-dasharray="12 4 1 4" stroke-linecap="round" opacity=".38" transform="rotate(-26 32 32)"/>
+  <circle cx="32" cy="32" r="21.7" fill="none" stroke="#4aa486" stroke-width=".7" stroke-dasharray="1 5" stroke-linecap="round" opacity=".22"/>
+  <path d="M13 32h7l4-9 7 20 6-17 4 6h10" fill="none" stroke="#062d23" stroke-width="6.2" stroke-linecap="round" stroke-linejoin="round" opacity=".58"/>
+  <path d="M13 32h7l4-9 7 20 6-17 4 6h10" fill="none" stroke="url(#signal)" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round" opacity=".9" filter="url(#signal-glow)"/>
+  <path d="M13 32h7l4-9 7 20 6-17 4 6h10" fill="none" stroke="#8ee0c1" stroke-width=".65" stroke-linecap="round" stroke-linejoin="round" opacity=".4"/>
+</svg>

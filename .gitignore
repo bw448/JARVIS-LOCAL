@@ -1,0 +1,29 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+.build-windows/
+dist/
+build/
+*.egg-info/
+.jarvis-data/
+models/
+*.wav
+*.mp3
+.env
+
+# Local desktop/runtime diagnostics and browser test profiles.
+.desktop-*.txt
+.desktop-*.json
+.desktop-test-data/
+.edge-cdp-profile/
+.tmp-cdp/
+*.log
+*.sqlite
+*.sqlite3
+
+# Local editor and operating-system metadata.
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
