@@ -1,5 +1,15 @@
 # JARVIS LOCAL
 
+## 快速下载（免搭建环境）
+
+直接下载官方离线安装包（Windows x64，约 1.05 GB，已内置本地语音模型）：
+
+👉 [**JARVIS-LOCAL-0.4.0-Windows-x64-Offline.zip**](https://github.com/bw448/jarvis-assistant/releases/download/v0.4.0/JARVIS-LOCAL-0.4.0-Windows-x64-Offline.zip)
+
+完整解压后双击 `JARVIS LOCAL.exe` 即可运行（`_internal` 目录是必需组件，不要单独移动 EXE）。建议同时下载同名 `.sha256` 文件校验完整性。以下是从源码搭建的方式，适合想开发或改动的用户。
+
+---
+
 JARVIS LOCAL 是一个独立编写、本地优先的私人语音助手。产品外壳名称固定为 **JARVIS LOCAL**，应用中的智能体名字、主人称呼和性格可以随时修改。
 
 当前 `0.4.0` 版本已经形成完整的本地双向语音闭环，并重新整理了交互层：
