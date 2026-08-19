@@ -405,13 +405,13 @@ class ComputerUseService:
         free_gib = disk.free / (1024**3)
         total_gib = disk.total / (1024**3)
         
-        import psutil
-        memory = psutil.virtual_memory()
+        # import psutil
+        # memory = psutil.virtual_memory()  # 需要psutil库
         
         return (
             f"系统：{platform.system()} {platform.release()}\n"
             f"CPU：{os.cpu_count() or '未知'} 逻辑核心\n"
-            f"内存：{memory.used / (1024**3):.1f} / {memory.total / (1024**3):.1f} GB ({memory.percent}%)\n"
+            f"内存：信息不可用（需要psutil库）\n"
             f"系统盘：{free_gib:.1f} / {total_gib:.1f} GB 可用"
         )
     

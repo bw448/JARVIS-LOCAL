@@ -341,6 +341,18 @@ class EnhancedJarvisApplication:
         )
 
 
+    def get_performance_stats(self) -> dict[str, Any]:
+        """获取性能统计"""
+        return {
+            "tts_cache": get_tts_cache().stats(),
+            "metrics": get_metrics().get_stats(),
+        }
+
+    def clear_cache(self):
+        """清空缓存"""
+        get_tts_cache().clear()
+
+
 class EnhancedJarvisHTTPServer(ThreadingHTTPServer):
     daemon_threads = True
 
