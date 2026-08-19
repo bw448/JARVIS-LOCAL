@@ -5,7 +5,7 @@ import tempfile
 import threading
 import unittest
 from pathlib import Path
-from urllib import request
+from urllib import error, request
 
 from jarvis.app import JarvisApplication, create_server
 from jarvis.config import SettingsStore
@@ -47,7 +47,7 @@ class ServerTests(unittest.TestCase):
             payload = json.load(response)
         self.assertEqual(payload["settings"]["identity"]["assistant_name"], "JARVIS")
         self.assertEqual(payload["app"]["name"], "JARVIS LOCAL")
-        self.assertEqual(payload["app"]["version"], "0.4.0")
+        self.assertEqual(payload["app"]["version"], "0.7.0")
         self.assertEqual(payload["settings"]["appearance"]["theme"], "cyan")
         self.assertEqual(payload["settings"]["appearance"]["floating_opacity"], 0.85)
         self.assertTrue(payload["settings"]["interaction"]["proactive_speech"])
@@ -145,6 +145,61 @@ class ServerTests(unittest.TestCase):
             payload = json.load(response)
         self.assertEqual(payload["mode"], "browser")
         self.assertEqual(captured, {"voice": "zf_xiaoni", "speaker_id": 46})
+
+    def test_chat_stream_endpoint_uses_ndjson(self) -> None:
+        class FakeBrain:
+            def stream(self, settings, messages, api_key="", voice_context=""):
+                yield "马上"
+                yield "为你处理。"
+
+        self.application.brain = FakeBrain()
+        outgoing = request.Request(
+            f"{self.base_url}/api/chat/stream",
+            data=json.dumps(
+                {"messages": [{"role": "user", "content": "开始"}]}
+            ).encode("utf-8"),
+            headers={"Content-Type": "application/json", "Origin": self.base_url},
+            method="POST",
+        )
+        with request.urlopen(outgoing, timeout=2) as response:
+            lines = [json.loads(line) for line in response if line.strip()]
+            content_type = response.headers.get_content_type()
+
+        self.assertEqual(content_type, "application/x-ndjson")
+        self.assertEqual([line["type"] for line in lines], ["delta", "delta", "done"])
+        self.assertEqual(lines[-1]["answer"], "马上为你处理。")
+
+    def test_tool_resolution_requires_enabled_control_and_one_time_proposal(self) -> None:
+        disabled = request.Request(
+            f"{self.base_url}/api/tools/resolve",
+            data=json.dumps({"proposal_id": "missing", "approved": False}).encode(
+                "utf-8"
+            ),
+            headers={"Content-Type": "application/json", "Origin": self.base_url},
+            method="POST",
+        )
+        with self.assertRaises(error.HTTPError) as captured:
+            request.urlopen(disabled, timeout=2)
+        self.assertEqual(captured.exception.code, 400)
+        captured.exception.close()
+
+        self.application._settings.interaction.computer_control_enabled = True
+        proposal = self.application.computer.propose(
+            "open_application", {"application": "calculator"}
+        )
+        outgoing = request.Request(
+            f"{self.base_url}/api/tools/resolve",
+            data=json.dumps(
+                {"proposal_id": proposal["proposal_id"], "approved": False}
+            ).encode("utf-8"),
+            headers={"Content-Type": "application/json", "Origin": self.base_url},
+            method="POST",
+        )
+        with request.urlopen(outgoing, timeout=2) as response:
+            payload = json.load(response)
+
+        self.assertFalse(payload["executed"])
+        self.assertIn("已取消", payload["message"])
 
 
 if __name__ == "__main__":

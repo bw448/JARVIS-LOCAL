@@ -23,7 +23,7 @@
         <span class="brand-mark"><img src="/static/jarvis-hud-logo.png" alt=""></span>
         <span class="brand-copy">
           <strong id="product-name">JARVIS LOCAL</strong>
-          <small>PRIVATE SIGNAL DESK <span id="app-version">0.4.0</span></small>
+          <small>PRIVATE SIGNAL DESK <span id="app-version">0.7.0</span></small>
         </span>
       </a>
 
@@ -61,7 +61,7 @@
             <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
             <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
           </div>
-          <div class="signal-monogram" id="core-monogram">J</div>
+          <div class="signal-monogram" id="core-monogram"><img src="/static/mark.svg" alt=""></div>
           <span class="signal-corner corner-a"></span>
           <span class="signal-corner corner-b"></span>
         </div>
@@ -167,7 +167,7 @@
         <div class="hud-ring ring-inner"></div>
         <div class="hud-scope"><span></span><span></span></div>
         <div class="hud-energy"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-        <div id="voice-hud-monogram" class="hud-monogram">J</div>
+        <div id="voice-hud-monogram" class="hud-monogram"><img src="/static/mark.svg" alt=""></div>
       </div>
       <div class="voice-hud-copy">
         <span class="micro-label">CONTINUOUS CONVERSATION</span>
@@ -223,6 +223,7 @@
             <label><span>请求超时（秒）</span><input id="setting-brain-timeout" type="number" min="10" max="600" step="1"></label>
           </div>
           <label class="check-row subtle-row"><input id="setting-clear-api-key" type="checkbox"><span><strong>清除已保存的密钥</strong><small id="api-key-state">当前未保存密钥</small></span></label>
+          <label class="check-row"><input id="setting-computer-control" type="checkbox"><span><strong>启用电脑白名单控制</strong><small>只开放固定系统动作；任何状态变更都会先显示预览并等待确认</small></span></label>
         </section>
 
         <section class="settings-section">
@@ -239,7 +240,7 @@
           <div class="field-grid three-columns voice-primary-fields">
             <label><span>女生音色</span><select id="setting-kokoro-voice-preset"><option value="47" data-voice="zf_xiaoxiao">晓晓 · 甜美女声（默认）</option><option value="46" data-voice="zf_xiaoni">晓妮 · 元气女声</option><option value="48" data-voice="zf_xiaoyi">晓伊 · 温柔女声</option><option value="45" data-voice="zf_xiaobei">晓北 · 清亮女声</option></select></label>
             <label class="range-field"><span>语速 <output id="speed-output">1.0</output></span><input id="setting-tts-speed" type="range" min="0.5" max="1.5" step="0.05"></label>
-            <label class="range-field"><span>停顿后发送 <output id="silence-output">1.2 秒</output></span><input id="setting-silence-seconds" type="range" min="0.6" max="3" step="0.1"></label>
+            <label class="range-field"><span>停顿后发送 <output id="silence-output">0.8 秒</output></span><input id="setting-silence-seconds" type="range" min="0.4" max="3" step="0.1"></label>
           </div>
           <div class="voice-test-row">
             <button id="test-voice-button" class="secondary-button" type="button">试听当前声音</button>
@@ -250,9 +251,9 @@
             <summary>高级语音设置</summary>
             <div class="advanced-settings-body">
               <div class="field-grid three-columns">
-                <label><span>语音合成引擎</span><select id="setting-tts-provider"><option value="sherpa_kokoro">Kokoro 本地多女声</option><option value="sherpa_onnx">MeloTTS 兼容模式</option><option value="system">Windows 系统语音</option><option value="kokoro">Kokoro Python</option><option value="external">外部兼容 TTS</option></select></label>
-                <label><span>本地识别引擎</span><select id="setting-stt-provider"><option value="faster_whisper">faster-whisper 本地</option><option value="disabled">关闭语音识别</option></select></label>
-                <label><span>识别模型</span><select id="setting-stt-model"><option value="tiny">tiny（最快）</option><option value="base">base</option><option value="small">small（推荐）</option><option value="medium">medium（更准确）</option></select></label>
+                <label><span>语音合成引擎</span><select id="setting-tts-provider"><option value="sherpa_kokoro">Kokoro 本地多女声</option><option value="sherpa_onnx">MeloTTS 兼容模式</option><option value="system">Windows 系统语音</option><option value="kokoro">Kokoro Python</option><option value="external">本地高品质服务 / 兼容 TTS</option></select></label>
+                <label><span>本地识别引擎</span><select id="setting-stt-provider"><option value="faster_whisper">faster-whisper 本地</option><option value="sensevoice">SenseVoice 本地工作进程</option><option value="disabled">关闭语音识别</option></select></label>
+                <label><span>识别模型</span><select id="setting-stt-model"><option value="tiny">tiny（最快）</option><option value="base">base</option><option value="small">small（Whisper 推荐）</option><option value="medium">medium（更准确）</option><option value="SenseVoiceSmall">SenseVoiceSmall</option></select></label>
               </div>
               <div id="sherpa-tts-fields" class="provider-fields">
                 <label><span>模型目录（留空使用包内模型）</span><input id="setting-tts-model-dir" maxlength="1000"></label>
@@ -265,12 +266,18 @@
               </div>
               <div id="kokoro-tts-fields" class="provider-fields" hidden><label><span>Kokoro 音色</span><input id="setting-tts-voice" maxlength="120"></label></div>
               <div id="external-tts-field" class="provider-fields" hidden>
-                <div class="field-grid two-columns"><label><span>外部语音接口</span><input id="setting-tts-url" type="url" maxlength="500"></label><label><span>服务端音色</span><input id="setting-external-voice" maxlength="120"></label></div>
+                <div class="field-grid two-columns"><label><span>本地/兼容语音接口</span><input id="setting-tts-url" type="url" maxlength="500" placeholder="http://127.0.0.1:9880/v1/audio/speech"></label><label><span>服务端音色</span><input id="setting-external-voice" maxlength="120" placeholder="Vivian"></label></div>
+                <label><span>语音风格指令</span><input id="setting-tts-instructions" maxlength="300" placeholder="自然、温和、有陪伴感"></label>
+                <p class="provider-hint">可连接运行在本机的 Qwen3-TTS、CosyVoice 等语音工作进程；接口需兼容下方文档约定。</p>
               </div>
               <div id="stt-detail-fields" class="field-grid three-columns">
                 <label><span>识别设备</span><select id="setting-stt-device"><option value="cpu">CPU</option><option value="cuda">NVIDIA CUDA</option><option value="auto">自动</option></select></label>
                 <label><span>识别语言</span><input id="setting-stt-language" maxlength="20" placeholder="zh"></label>
                 <label class="check-row inline-check"><input id="setting-auto-send-transcript" type="checkbox"><span><strong>单次识别后直接发送</strong><small>连续语音不受此项影响</small></span></label>
+              </div>
+              <div id="sensevoice-stt-field" class="provider-fields" hidden>
+                <label><span>SenseVoice 转写接口</span><input id="setting-stt-url" type="url" maxlength="500" placeholder="http://127.0.0.1:50000/v1/audio/transcriptions"></label>
+                <p class="provider-hint">使用 OpenAI-compatible multipart 转写协议；推荐将 SenseVoice 运行在独立本地进程。</p>
               </div>
               <label class="check-row"><input id="setting-browser-fallback" type="checkbox"><span><strong>本地模型不可用时，允许系统语音回退</strong></span></label>
             </div>

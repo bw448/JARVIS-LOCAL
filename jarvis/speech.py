@@ -10,12 +10,14 @@ import shutil
 import sys
 import tempfile
 import threading
+import uuid
 import wave
 from array import array
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 from urllib import error, request
+from urllib.parse import urlsplit, urlunsplit
 
 from .config import DEFAULT_TTS_PROVIDER, Settings, default_data_dir
 from .runtime import bundled_path
@@ -29,6 +31,13 @@ class SpeechError(RuntimeError):
 class AudioResult:
     data: bytes
     content_type: str = "audio/wav"
+
+
+@dataclass(slots=True)
+class TranscriptionResult:
+    text: str
+    language: str = ""
+    emotion: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -330,6 +339,56 @@ def _pcm16_wav(samples: Iterable[float], sample_rate: int) -> bytes:
     return output.getvalue()
 
 
+def _multipart_audio_body(
+    fields: dict[str, str],
+    audio: bytes,
+    content_type: str,
+) -> tuple[bytes, str]:
+    """Build a bounded OpenAI-compatible multipart transcription request."""
+
+    boundary = f"jarvis-{uuid.uuid4().hex}"
+    chunks: list[bytes] = []
+    for name, value in fields.items():
+        chunks.extend(
+            [
+                f"--{boundary}\r\n".encode("ascii"),
+                f'Content-Disposition: form-data; name="{name}"\r\n\r\n'.encode(
+                    "ascii"
+                ),
+                str(value).encode("utf-8"),
+                b"\r\n",
+            ]
+        )
+    extension = {
+        "audio/webm": "webm",
+        "audio/wav": "wav",
+        "audio/x-wav": "wav",
+        "audio/mpeg": "mp3",
+        "audio/mp4": "m4a",
+        "audio/ogg": "ogg",
+    }.get(content_type.split(";", 1)[0].lower(), "bin")
+    chunks.extend(
+        [
+            f"--{boundary}\r\n".encode("ascii"),
+            (
+                'Content-Disposition: form-data; name="file"; '
+                f'filename="recording.{extension}"\r\n'
+            ).encode("ascii"),
+            f"Content-Type: {content_type}\r\n\r\n".encode("ascii"),
+            audio,
+            b"\r\n",
+            f"--{boundary}--\r\n".encode("ascii"),
+        ]
+    )
+    return b"".join(chunks), f"multipart/form-data; boundary={boundary}"
+
+
+def _worker_health_url(endpoint: str) -> str:
+    parsed = urlsplit(endpoint)
+    prefix = parsed.path.split("/v1/", 1)[0].rstrip("/")
+    return urlunsplit((parsed.scheme, parsed.netloc, f"{prefix}/health", "", ""))
+
+
 class SpeechService:
     MAX_AUDIO_BYTES = 25 * 1024 * 1024
     MAX_TTS_BYTES = 20 * 1024 * 1024
@@ -348,12 +407,58 @@ class SpeechService:
         with self._kokoro_lock:
             self._kokoro_pipeline = None
 
+    def prewarm(self, settings: Settings) -> dict[str, str]:
+        """Load configured local models off the interaction path."""
+
+        result: dict[str, str] = {}
+        if settings.stt.provider == "faster_whisper":
+            try:
+                self._get_whisper_model(settings)
+                result["stt"] = "ready"
+            except SpeechError as exc:
+                result["stt"] = str(exc)
+        elif settings.stt.provider == "sensevoice":
+            try:
+                self._probe_worker(settings.stt.external_url, "SenseVoice")
+                result["stt"] = "ready"
+            except SpeechError as exc:
+                result["stt"] = str(exc)
+        if settings.tts.provider in {
+            "sherpa_kokoro",
+            "sherpa_onnx",
+            "kokoro",
+            "external",
+        }:
+            try:
+                # A tiny discarded utterance initializes the complete acoustic path.
+                local_settings = Settings.from_mapping(settings.to_dict())
+                local_settings.tts.browser_fallback = False
+                self.synthesize(local_settings, "你好")
+                result["tts"] = "ready"
+            except SpeechError as exc:
+                result["tts"] = str(exc)
+        return result
+
     def capabilities(self, settings: Settings) -> dict[str, Any]:
         sherpa_installed = _module_available("sherpa_onnx")
         sherpa_provider = settings.tts.provider in {"sherpa_kokoro", "sherpa_onnx"}
         sherpa_model = locate_sherpa_model(settings) if sherpa_provider else None
         kokoro_installed = _module_available("kokoro")
         whisper_installed = _module_available("faster_whisper")
+
+        stt_ready = {
+            "disabled": True,
+            "faster_whisper": whisper_installed,
+            "sensevoice": bool(settings.stt.external_url),
+        }.get(settings.stt.provider, False)
+        if stt_ready:
+            stt_reason = "ready"
+        elif settings.stt.provider == "faster_whisper":
+            stt_reason = "faster_whisper_missing"
+        elif settings.stt.provider == "sensevoice":
+            stt_reason = "sensevoice_url_missing"
+        else:
+            stt_reason = "provider_unavailable"
 
         tts_ready = {
             "system": True,
@@ -395,7 +500,8 @@ class SpeechService:
             },
             "stt": {
                 "provider": settings.stt.provider,
-                "ready": settings.stt.provider == "disabled" or whisper_installed,
+                "ready": stt_ready,
+                "reason": stt_reason,
                 "faster_whisper_installed": whisper_installed,
             },
         }
@@ -563,6 +669,7 @@ class SpeechService:
             "input": text,
             "speed": settings.tts.speed,
             "response_format": "wav",
+            "instructions": settings.tts.instructions,
         }
         outgoing = request.Request(
             settings.tts.external_url,
@@ -588,15 +695,20 @@ class SpeechService:
         return AudioResult(data=data, content_type=content_type)
 
     def transcribe(self, settings: Settings, audio: bytes, content_type: str) -> str:
+        return self.transcribe_detailed(settings, audio, content_type).text
+
+    def transcribe_detailed(
+        self,
+        settings: Settings,
+        audio: bytes,
+        content_type: str,
+    ) -> TranscriptionResult:
         if settings.stt.provider == "disabled":
             raise SpeechError("语音识别已关闭")
         if not audio:
             raise SpeechError("没有收到录音")
         if len(audio) > self.MAX_AUDIO_BYTES:
             raise SpeechError("录音文件过大")
-        if not _module_available("faster_whisper"):
-            raise SpeechError("faster-whisper 尚未安装，请执行语音组件安装脚本")
-
         media_type = content_type.split(";", 1)[0].strip().lower()
         suffixes = {
             "audio/webm": ".webm",
@@ -609,27 +721,14 @@ class SpeechService:
         if media_type not in suffixes:
             raise SpeechError("不支持的录音格式")
 
-        from faster_whisper import WhisperModel
+        if settings.stt.provider == "sensevoice":
+            return self._external_stt(settings, audio, media_type)
+        if settings.stt.provider != "faster_whisper":
+            raise SpeechError("不支持的语音识别提供商")
+        if not _module_available("faster_whisper"):
+            raise SpeechError("faster-whisper 尚未安装，请执行语音组件安装脚本")
 
-        resolved_model = resolve_whisper_model(settings.stt.model)
-        key = (resolved_model, settings.stt.device)
-        with self._whisper_lock:
-            model = self._whisper_models.get(key)
-            if model is None:
-                compute_type = {
-                    "cuda": "float16",
-                    "cpu": "int8",
-                    "auto": "default",
-                }[settings.stt.device]
-                try:
-                    model = WhisperModel(
-                        resolved_model,
-                        device=settings.stt.device,
-                        compute_type=compute_type,
-                    )
-                except Exception as exc:
-                    raise SpeechError(f"语音识别模型加载失败：{exc}") from exc
-                self._whisper_models[key] = model
+        model = self._get_whisper_model(settings)
 
         temporary_path: Path | None = None
         try:
@@ -652,4 +751,105 @@ class SpeechService:
                 temporary_path.unlink(missing_ok=True)
         if not text:
             raise SpeechError("没有识别到清晰语音")
-        return text[:20_000]
+        return TranscriptionResult(text=text[:20_000])
+
+    def _probe_worker(self, endpoint: str, label: str) -> None:
+        if not endpoint:
+            raise SpeechError(f"尚未配置{label}服务地址")
+        outgoing = request.Request(
+            _worker_health_url(endpoint),
+            headers={"Accept": "application/json"},
+            method="GET",
+        )
+        try:
+            with request.urlopen(outgoing, timeout=3) as response:
+                response.read(64 * 1024)
+        except error.HTTPError as exc:
+            raise SpeechError(f"{label}健康检查返回 HTTP {exc.code}") from exc
+        except (error.URLError, TimeoutError, OSError) as exc:
+            raise SpeechError(f"无法连接{label}本地工作进程") from exc
+
+    def _external_stt(
+        self,
+        settings: Settings,
+        audio: bytes,
+        content_type: str,
+    ) -> TranscriptionResult:
+        if not settings.stt.external_url:
+            raise SpeechError("尚未配置 SenseVoice 转写接口")
+        body, multipart_type = _multipart_audio_body(
+            {
+                "model": settings.stt.model or "SenseVoiceSmall",
+                "language": settings.stt.language or "auto",
+                "response_format": "json",
+            },
+            audio,
+            content_type,
+        )
+        outgoing = request.Request(
+            settings.stt.external_url,
+            data=body,
+            headers={"Content-Type": multipart_type, "Accept": "application/json"},
+            method="POST",
+        )
+        try:
+            with request.urlopen(outgoing, timeout=120) as response:
+                raw = response.read(1024 * 1024)
+        except error.HTTPError as exc:
+            detail = exc.read(1024).decode("utf-8", errors="replace")
+            raise SpeechError(
+                f"SenseVoice 服务返回 HTTP {exc.code}：{detail[:240]}"
+            ) from exc
+        except (error.URLError, TimeoutError, OSError) as exc:
+            raise SpeechError("无法连接 SenseVoice 本地工作进程") from exc
+        try:
+            payload = json.loads(raw)
+            text = str(payload.get("text", "")).strip()
+            language = str(payload.get("language", "")).strip().lower()
+            emotion = str(payload.get("emotion", "")).strip().lower()
+        except (json.JSONDecodeError, AttributeError) as exc:
+            raise SpeechError("SenseVoice 服务返回了无法识别的数据") from exc
+        if not text:
+            raise SpeechError("SenseVoice 没有识别到清晰语音")
+        allowed_languages = {"zh", "en", "yue", "ja", "ko"}
+        allowed_emotions = {
+            "happy",
+            "sad",
+            "angry",
+            "neutral",
+            "fearful",
+            "disgusted",
+            "surprised",
+        }
+        return TranscriptionResult(
+            text=text[:20_000],
+            language=language if language in allowed_languages else "",
+            emotion=emotion if emotion in allowed_emotions else "",
+        )
+
+    def _get_whisper_model(self, settings: Settings) -> Any:
+        if not _module_available("faster_whisper"):
+            raise SpeechError("faster-whisper 尚未安装，请执行语音组件安装脚本")
+        from faster_whisper import WhisperModel
+
+        resolved_model = resolve_whisper_model(settings.stt.model)
+        key = (resolved_model, settings.stt.device)
+        with self._whisper_lock:
+            model = self._whisper_models.get(key)
+            if model is not None:
+                return model
+            compute_type = {
+                "cuda": "float16",
+                "cpu": "int8",
+                "auto": "default",
+            }[settings.stt.device]
+            try:
+                model = WhisperModel(
+                    resolved_model,
+                    device=settings.stt.device,
+                    compute_type=compute_type,
+                )
+            except Exception as exc:
+                raise SpeechError(f"语音识别模型加载失败：{exc}") from exc
+            self._whisper_models[key] = model
+            return model

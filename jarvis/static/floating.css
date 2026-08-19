@@ -160,6 +160,7 @@ body[data-active="true"] .hud-emblem { filter: drop-shadow(0 14px 24px rgba(0,0,
   letter-spacing: .13em;
   text-shadow: 0 0 9px rgba(var(--hud-rgb), .54);
 }
+.hud-name img { width: 34px; height: 34px; display: block; filter: drop-shadow(0 0 7px rgba(var(--hud-rgb), .42)); }
 .core-status,
 .core-mode { position: relative; z-index: 2; display: block; max-width: 88px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-align: center; }
 .core-status { color: rgba(209, 245, 247, .76); font-size: 7px; font-weight: 650; letter-spacing: .08em; }

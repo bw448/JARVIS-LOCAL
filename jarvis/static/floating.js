@@ -67,10 +67,6 @@ function applyState(payload = {}) {
   );
   action.setAttribute("aria-pressed", String(voiceMode));
   action.setAttribute("aria-label", voiceMode ? "关闭连续语音模式" : "开启连续语音模式");
-  monogram.textContent = Array.from(payload.assistantName || "JARVIS")
-    .slice(0, 10)
-    .join("")
-    .toUpperCase();
   statusLabel.textContent = labels[voiceState] || labels.idle;
   modeLabel.textContent = voiceMode ? "连续语音运行中" : "点击核心开始对话";
 }

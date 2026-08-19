@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import json
 import sys
 import tempfile
 import types
@@ -16,6 +17,7 @@ from jarvis.speech import (
     default_sherpa_model_dir,
     locate_sherpa_model,
     resolve_whisper_model,
+    _worker_health_url,
 )
 
 
@@ -49,6 +51,101 @@ def make_kokoro_model_directory(root: Path) -> Path:
 
 
 class SpeechTests(unittest.TestCase):
+    def test_external_tts_forwards_voice_style_instructions(self) -> None:
+        captured = {}
+
+        class Headers:
+            def get_content_type(self):
+                return "audio/wav"
+
+        class WorkerResponse:
+            headers = Headers()
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return None
+
+            def read(self, maximum):
+                return b"RIFF-fake-wav"
+
+        def fake_urlopen(outgoing, timeout):
+            captured["payload"] = json.loads(outgoing.data)
+            return WorkerResponse()
+
+        settings = Settings()
+        settings.tts.provider = "external"
+        settings.tts.external_url = "http://127.0.0.1:9880/v1/audio/speech"
+        settings.tts.voice = "Vivian"
+        settings.tts.instructions = "温柔但不要夸张"
+        with patch("jarvis.speech.request.urlopen", side_effect=fake_urlopen):
+            result = SpeechService().synthesize(settings, "我在这里。")
+
+        self.assertEqual(captured["payload"]["voice"], "Vivian")
+        self.assertEqual(captured["payload"]["instructions"], "温柔但不要夸张")
+        self.assertEqual(result.data, b"RIFF-fake-wav")
+
+    def test_worker_health_url_is_derived_from_openai_endpoint(self) -> None:
+        self.assertEqual(
+            _worker_health_url(
+                "http://127.0.0.1:50000/v1/audio/transcriptions"
+            ),
+            "http://127.0.0.1:50000/health",
+        )
+
+    def test_sensevoice_worker_receives_openai_multipart_audio(self) -> None:
+        captured = {}
+
+        class WorkerResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return None
+
+            def read(self, maximum):
+                return json.dumps(
+                    {"text": "你好，先生。", "language": "zh", "emotion": "sad"}
+                ).encode("utf-8")
+
+        def fake_urlopen(outgoing, timeout):
+            captured["url"] = outgoing.full_url
+            captured["content_type"] = outgoing.get_header("Content-type")
+            captured["body"] = outgoing.data
+            return WorkerResponse()
+
+        settings = Settings()
+        settings.stt.provider = "sensevoice"
+        settings.stt.model = "SenseVoiceSmall"
+        settings.stt.external_url = (
+            "http://127.0.0.1:50000/v1/audio/transcriptions"
+        )
+        service = SpeechService()
+        with patch("jarvis.speech.request.urlopen", side_effect=fake_urlopen):
+            result = service.transcribe_detailed(
+                settings, b"fake-webm-audio", "audio/webm"
+            )
+
+        self.assertEqual(captured["url"], settings.stt.external_url)
+        self.assertIn("multipart/form-data", captured["content_type"])
+        self.assertIn(b'SenseVoiceSmall', captured["body"])
+        self.assertIn(b'filename="recording.webm"', captured["body"])
+        self.assertIn(b"fake-webm-audio", captured["body"])
+        self.assertEqual(result.text, "你好，先生。")
+        self.assertEqual(result.language, "zh")
+        self.assertEqual(result.emotion, "sad")
+
+    def test_prewarm_reports_a_missing_configured_runtime(self) -> None:
+        settings = Settings()
+        settings.tts.provider = "system"
+        service = SpeechService()
+
+        with patch("jarvis.speech._module_available", return_value=False):
+            result = service.prewarm(settings)
+
+        self.assertIn("faster-whisper", result["stt"])
+
     def test_bundled_models_are_preferred_when_present(self) -> None:
         bundled_tts = Path("D:/portable/models/tts/kokoro-multi-lang-v1_0")
         bundled_stt = Path("D:/portable/models/stt/faster-whisper-small")

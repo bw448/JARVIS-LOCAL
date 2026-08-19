@@ -9,7 +9,8 @@ $global:LASTEXITCODE = 0
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 $BuildRoot = Join-Path $ProjectRoot ".build-windows"
 $DownloadRoot = Join-Path $BuildRoot "downloads"
-$PythonRoot = Join-Path $BuildRoot "python-3.12.10"
+$PythonVersion = "3.11.9"
+$PythonRoot = Join-Path $BuildRoot "python-$PythonVersion"
 $PythonExe = Join-Path $PythonRoot "python.exe"
 $AssetRoot = Join-Path $BuildRoot "assets"
 $ModelRoot = Join-Path $AssetRoot "models"
@@ -18,11 +19,11 @@ $TtsModel = Join-Path $TtsRoot "kokoro-multi-lang-v1_0"
 $SttModel = Join-Path $ModelRoot "stt\faster-whisper-small"
 $PrerequisiteRoot = Join-Path $AssetRoot "prerequisites"
 $DistRoot = Join-Path $ProjectRoot "dist"
-$ReleaseName = "JARVIS-LOCAL-0.4.0-Windows-x64-Offline"
+$ReleaseName = "JARVIS-LOCAL-0.7.0-Windows-x64-Offline"
 $ReleaseDirectory = Join-Path $DistRoot $ReleaseName
 $ArchivePath = Join-Path $DistRoot "$ReleaseName.zip"
 
-$PythonInstallerUrl = "https://www.python.org/ftp/python/3.12.10/python-3.12.10-amd64.exe"
+$PythonInstallerUrl = "https://www.python.org/ftp/python/$PythonVersion/python-$PythonVersion-amd64.exe"
 $KokoroUrl = "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-multi-lang-v1_0.tar.bz2"
 $WebView2Url = "https://go.microsoft.com/fwlink/?linkid=2124701"
 
@@ -112,7 +113,7 @@ function Test-KokoroModel {
 New-Item -ItemType Directory -Force -Path $BuildRoot, $DownloadRoot, $AssetRoot, $DistRoot | Out-Null
 
 if (-not (Test-Path $PythonExe)) {
-    $PythonInstaller = Join-Path $DownloadRoot "python-3.12.10-amd64.exe"
+    $PythonInstaller = Join-Path $DownloadRoot "python-$PythonVersion-amd64.exe"
     Invoke-Download $PythonInstallerUrl $PythonInstaller
     Assert-SignedBy $PythonInstaller "Python Software Foundation"
     Write-Host "Installing the project-local Python build runtime..." -ForegroundColor Cyan
@@ -203,7 +204,7 @@ $PackageLines = @(
     $PackageList -split "`r?`n" |
         Where-Object { $_ -and $_ -notmatch '^# Editable install' -and $_ -notmatch '^-e\s+' }
 )
-$PackageLines += "jarvis-assistant==0.4.0"
+$PackageLines += "jarvis-assistant==0.7.0"
 $SanitizedPackageList = ($PackageLines | Sort-Object -Unique) -join "`r`n"
 [System.IO.File]::WriteAllText(
     (Join-Path $ReleaseDirectory "PYTHON-PACKAGES.txt"),
@@ -214,7 +215,7 @@ $PythonVersion = (Invoke-NativeCapture $PythonExe @("--version")).Trim()
 
 $BuildInfo = [ordered]@{
     app = "JARVIS LOCAL"
-    version = "0.4.0"
+    version = "0.7.0"
     edition = "Windows x64 complete offline voice"
     built_at = (Get-Date).ToUniversalTime().ToString("o")
     python = $PythonVersion
@@ -231,7 +232,7 @@ if ($SelfTest.ExitCode -ne 0) {
     if (Test-Path $SelfTestReport) { Get-Content $SelfTestReport }
     throw "Frozen offline speech self-test failed."
 }
-$SelfTestData = Get-Content -LiteralPath $SelfTestReport -Raw | ConvertFrom-Json
+$SelfTestData = Get-Content -LiteralPath $SelfTestReport -Raw -Encoding UTF8 | ConvertFrom-Json
 $SelfTestData.bundle_root = "_internal"
 $SelfTestData.stt_model = "_internal\models\stt\faster-whisper-small"
 $SanitizedSelfTest = $SelfTestData | ConvertTo-Json -Depth 10
@@ -240,6 +241,16 @@ $SanitizedSelfTest = $SelfTestData | ConvertTo-Json -Depth 10
     $SanitizedSelfTest + "`r`n",
     (New-Object System.Text.UTF8Encoding($false))
 )
+
+$AcceptanceReport = Join-Path $ReleaseDirectory "ACCEPTANCE-REPORT.md"
+$ExitCode = Invoke-NativeCommand $PythonExe @(
+    (Join-Path $PSScriptRoot "windows_acceptance.py"),
+    "--package-dir", $ReleaseDirectory,
+    "--output", $AcceptanceReport
+)
+if ($ExitCode -ne 0) {
+    throw "Frozen offline package acceptance diagnostics failed."
+}
 
 if (-not $SkipArchive) {
     if (Test-Path $ArchivePath) { Remove-Item -LiteralPath $ArchivePath -Force }

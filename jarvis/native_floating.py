@@ -230,7 +230,8 @@ class NativeFloatingWindow:
             self._root = None
 
     def _display_name(self) -> str:
-        return "".join(list(self._assistant_name)[:10]).upper() or "JARVIS"
+        # The visual HUD is product identity, not the configurable agent name.
+        return "系统待命"
 
     def _build_hud(self, tk: Any, pixel_width: int, pixel_height: int) -> None:
         canvas = self._canvas

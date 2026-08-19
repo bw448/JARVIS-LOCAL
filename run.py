@@ -30,6 +30,7 @@ def main() -> None:
             last_error = exc
     if server is None:
         raise SystemExit(f"无法启动本地服务：{last_error}")
+    server.application.start_prewarm()
 
     host, port = server.server_address[:2]
     browser_host = "127.0.0.1" if host in {"0.0.0.0", "::"} else host

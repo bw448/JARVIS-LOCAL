@@ -13,7 +13,7 @@ class SettingsTests(unittest.TestCase):
         settings = Settings.from_mapping({})
         self.assertEqual(settings.identity.assistant_name, "JARVIS")
         self.assertEqual(settings.identity.owner_name, "先生")
-        self.assertEqual(settings.version, 4)
+        self.assertEqual(settings.version, 7)
         self.assertEqual(settings.tts.provider, "sherpa_kokoro")
         self.assertEqual(settings.tts.voice, "zf_xiaoxiao")
         self.assertEqual(settings.tts.speaker_id, 47)
@@ -24,6 +24,10 @@ class SettingsTests(unittest.TestCase):
         self.assertTrue(settings.appearance.floating_window)
         self.assertTrue(settings.interaction.proactive_speech)
         self.assertFalse(settings.interaction.voice_mode_auto_start)
+        self.assertEqual(settings.interaction.silence_seconds, 0.8)
+        self.assertTrue(settings.interaction.streaming_responses)
+        self.assertTrue(settings.interaction.prewarm_models)
+        self.assertFalse(settings.interaction.computer_control_enabled)
         self.assertFalse(settings.privacy.save_conversations)
 
     def test_names_are_injected_into_system_prompt(self) -> None:
@@ -61,11 +65,19 @@ class SettingsTests(unittest.TestCase):
             "identity": {"assistant_name": "星期五", "owner_name": "老板"},
         }
         settings = Settings.from_mapping(raw)
-        self.assertEqual(settings.version, 4)
+        self.assertEqual(settings.version, 7)
         self.assertEqual(settings.identity.assistant_name, "星期五")
         self.assertEqual(settings.tts.provider, "sherpa_kokoro")
         self.assertEqual(settings.tts.speaker_id, 47)
         self.assertFalse(settings.stt.auto_send_transcript)
+
+    def test_version_four_default_silence_is_migrated_for_faster_turns(self) -> None:
+        settings = Settings.from_mapping({
+            "version": 4,
+            "interaction": {"silence_seconds": 1.2},
+        })
+        self.assertEqual(settings.version, 7)
+        self.assertEqual(settings.interaction.silence_seconds, 0.8)
 
     def test_invalid_appearance_values_are_rejected(self) -> None:
         raw = Settings().to_dict()
@@ -110,6 +122,25 @@ class SettingsTests(unittest.TestCase):
         settings = Settings.from_mapping(raw)
         self.assertEqual(settings.tts.provider, "sherpa_onnx")
         self.assertEqual(settings.tts.speaker_id, 2)
+
+    def test_sensevoice_worker_configuration_is_preserved(self) -> None:
+        raw = Settings().to_dict()
+        raw["stt"].update(
+            {
+                "provider": "sensevoice",
+                "model": "SenseVoiceSmall",
+                "external_url": "http://127.0.0.1:50000/v1/audio/transcriptions",
+            }
+        )
+
+        settings = Settings.from_mapping(raw)
+
+        self.assertEqual(settings.stt.provider, "sensevoice")
+        self.assertEqual(settings.stt.model, "SenseVoiceSmall")
+        self.assertEqual(
+            settings.stt.external_url,
+            "http://127.0.0.1:50000/v1/audio/transcriptions",
+        )
 
 
 if __name__ == "__main__":

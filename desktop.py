@@ -648,6 +648,7 @@ def main() -> None:
         raise SystemExit("请先执行：pip install -e '.[desktop]'") from exc
 
     server = create_server("127.0.0.1", 0)
+    server.application.start_prewarm()
     port = server.server_address[1]
     worker = threading.Thread(target=server.serve_forever, daemon=True)
     worker.start()

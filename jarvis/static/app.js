@@ -14,6 +14,7 @@ const ui = Object.fromEntries([
   "temperature-output", "speed-output", "silence-output", "opacity-output",
   "floating-opacity-output",
   "sherpa-tts-fields", "kokoro-tts-fields", "external-tts-field", "stt-detail-fields",
+  "sensevoice-stt-field",
   "test-voice-button", "voice-test-status",
 ].map(id => [id, byId(id)]));
 
@@ -39,6 +40,8 @@ const state = {
   recordingDiscard: false,
   recordingHasSpeech: false,
   recordingCycle: 0,
+  voiceCaptureStream: null,
+  voiceStatusCheckedAt: 0,
   audioContext: null,
   analyser: null,
   analyserData: null,
@@ -51,12 +54,19 @@ const state = {
   audioUrl: null,
   speechController: null,
   speechSession: 0,
+  speechQueue: [],
+  speechQueueClosed: true,
+  speechQueueRunning: false,
+  speechQueueWake: null,
+  speechPlaybackResolve: null,
+  chatController: null,
+  chatSession: 0,
 };
 
 const voiceCopy = {
   idle: ["待命", "可以输入文字，或开启连续语音"],
   listening: ["正在聆听", "请直接说话，说完稍作停顿"],
-  transcribing: ["正在识别", "声音只交给本机 Whisper"],
+  transcribing: ["正在识别", "声音只交给本机识别引擎"],
   thinking: ["正在思考", "文字模型正在生成回答"],
   speaking: ["正在回应", "本机正在生成并播放声音"],
   error: ["需要处理", "请检查提示后重试"],
@@ -160,7 +170,7 @@ function ttsProviderLabel(provider) {
     sherpa_onnx: "MeloTTS 本地语音",
     kokoro: "Kokoro Python",
     system: "Windows 系统语音",
-    external: "外部语音",
+    external: "本地高品质语音服务",
   }[provider] || provider;
 }
 
@@ -170,6 +180,7 @@ function ttsNotReadyLabel(capability) {
     sherpa_model_missing: "缺少本地声音模型",
     kokoro_package_missing: "缺少 Kokoro",
     external_url_missing: "未填写服务地址",
+    worker_unreachable: "本地语音工作进程未就绪",
   }[capability.reason] || "尚未就绪";
 }
 
@@ -196,9 +207,8 @@ function renderSystemState() {
   ui["assistant-name"].textContent = assistant;
   ui["conversation-assistant-name"].textContent = assistant;
   ui["owner-line"].textContent = `为${owner}服务`;
-  const monogram = Array.from(assistant)[0]?.toUpperCase() || "J";
-  ui["core-monogram"].textContent = monogram;
-  ui["voice-hud-monogram"].textContent = monogram;
+  // Identity belongs to conversation, not to the product's visual core.
+  // Renaming the assistant must never turn the HUD into a large initial.
   applyAppearance(settings);
 
   const brainReady = settings.brain.provider !== "disabled";
@@ -211,7 +221,11 @@ function renderSystemState() {
   const sttReady = sttEnabled && capabilities.stt.ready;
   ui["stt-status"].textContent = !sttEnabled
     ? "已关闭"
-    : sttReady ? `本机 Whisper ${settings.stt.model}` : "本地识别尚未就绪";
+    : sttReady
+      ? settings.stt.provider === "sensevoice"
+        ? `SenseVoice · ${displayProviderHost(settings.stt.external_url)}`
+        : `本机 Whisper ${settings.stt.model}`
+      : "本地识别尚未就绪";
   setIndicator(ui["stt-indicator"], !sttEnabled || sttReady ? "ready" : "warning");
 
   const tts = capabilities.tts;
@@ -266,6 +280,20 @@ function appendMessage(role, content, options = {}) {
   return wrapper;
 }
 
+function prepareStreamingMessage(wrapper) {
+  const bubble = wrapper.querySelector(".message-bubble");
+  bubble.replaceChildren();
+  bubble.textContent = "";
+  wrapper.dataset.streaming = "true";
+  return bubble;
+}
+
+function updateStreamingMessage(wrapper, text) {
+  const bubble = wrapper.querySelector(".message-bubble");
+  bubble.textContent = text;
+  ui["message-list"].scrollTop = ui["message-list"].scrollHeight;
+}
+
 function addWelcomeMessage() {
   const { assistant_name: assistant, owner_name: owner } = state.bootstrap.settings.identity;
   const voiceReady = state.bootstrap.capabilities.tts.ready && state.bootstrap.capabilities.stt.ready;
@@ -302,6 +330,88 @@ function scheduleVoiceResume(delay = 450) {
   }, delay);
 }
 
+async function readChatStream(messages, controller, onEvent, voiceContext = null) {
+  const response = await fetch("/api/chat/stream", {
+    method: "POST",
+    signal: controller.signal,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ messages, voice_context: voiceContext }),
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload.error || `请求失败（HTTP ${response.status}）`);
+  }
+  if (!response.body?.getReader) throw new Error("当前窗口不支持流式回答");
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder("utf-8");
+  let buffered = "";
+  let doneEvent = null;
+  const consumeLine = rawLine => {
+    const line = rawLine.trim();
+    if (!line) return;
+    const event = JSON.parse(line);
+    if (event.type === "error") throw new Error(event.error || "模型流生成失败");
+    if (event.type === "done") doneEvent = event;
+    onEvent(event);
+  };
+
+  while (true) {
+    const { value, done } = await reader.read();
+    buffered += decoder.decode(value || new Uint8Array(), { stream: !done });
+    const lines = buffered.split("\n");
+    buffered = lines.pop() || "";
+    for (const line of lines) consumeLine(line);
+    if (done) break;
+  }
+  if (buffered.trim()) consumeLine(buffered);
+  if (!doneEvent) throw new Error("模型流意外结束");
+  return doneEvent;
+}
+
+function speechSafeText(text) {
+  return String(text || "")
+    .replace(/```[\s\S]*?```/g, " 代码内容已显示在屏幕上。")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/https?:\/\/\S+/g, "链接已显示在屏幕上")
+    .replace(/[>*#_~|]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractSpeechSegments(buffer, flush = false) {
+  const segments = [];
+  let rest = buffer;
+  while (rest.length) {
+    let boundary = -1;
+    for (let index = 0; index < rest.length; index += 1) {
+      const char = rest[index];
+      if ("。！？!?；;\n".includes(char) && index >= 5) {
+        boundary = index + 1;
+        break;
+      }
+      if ("，,：:".includes(char) && index >= 34) {
+        boundary = index + 1;
+        break;
+      }
+      if (index >= 72) {
+        boundary = index + 1;
+        break;
+      }
+    }
+    if (boundary < 0) break;
+    const segment = speechSafeText(rest.slice(0, boundary));
+    if (segment) segments.push(segment);
+    rest = rest.slice(boundary);
+  }
+  if (flush) {
+    const segment = speechSafeText(rest);
+    if (segment) segments.push(segment);
+    rest = "";
+  }
+  return { segments, rest };
+}
+
 async function sendMessage(providedText = "", options = {}) {
   if (state.busy) {
     if (!options.voice) showToast("上一条任务仍在处理中");
@@ -310,6 +420,8 @@ async function sendMessage(providedText = "", options = {}) {
   const text = (providedText || ui["message-input"].value).trim();
   if (!text) return false;
 
+  const chatSession = state.chatSession + 1;
+  state.chatSession = chatSession;
   state.busy = true;
   clearVoiceResumeTimer();
   pauseVoiceCapture(true);
@@ -319,40 +431,129 @@ async function sendMessage(providedText = "", options = {}) {
   resizeComposer();
   state.messages.push({ role: "user", content: text });
   appendMessage("user", text);
-  const thinking = appendMessage("assistant", "", { thinking: true });
-  setVoiceState("thinking");
+  const responseMessage = appendMessage("assistant", "", { thinking: true });
+  let responseBubble = null;
+  let answer = "";
+  let speechBuffer = "";
+  let toolProposal = null;
+  const settings = state.bootstrap.settings;
+  const shouldSpeak = state.voiceMode || settings.tts.auto_speak;
+  const speechSession = shouldSpeak ? beginSpeechStream() : null;
+  const controller = new AbortController();
+  state.chatController = controller;
+  setVoiceState("thinking", "正在生成回答，首句会立即回应");
+
+  const acceptDelta = delta => {
+    if (!delta) return;
+    if (!responseBubble) responseBubble = prepareStreamingMessage(responseMessage);
+    answer += delta;
+    updateStreamingMessage(responseMessage, answer);
+    if (speechSession !== null) {
+      speechBuffer += delta;
+      const extracted = extractSpeechSegments(speechBuffer);
+      speechBuffer = extracted.rest;
+      for (const segment of extracted.segments) enqueueSpeech(segment, speechSession);
+    }
+  };
+
+  const acceptSilentText = textValue => {
+    if (!textValue) return;
+    if (!responseBubble) responseBubble = prepareStreamingMessage(responseMessage);
+    answer += textValue;
+    updateStreamingMessage(responseMessage, answer);
+  };
 
   try {
-    const payload = await fetchJSON("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages: state.messages.slice(-24) }),
-    });
-    thinking.remove();
-    const answer = String(payload.answer || "").trim();
-    if (!answer) throw new Error("文字模型没有返回内容");
-    state.messages.push({ role: "assistant", content: answer });
-    appendMessage("assistant", answer);
+    let metrics = null;
+    if (settings.interaction?.streaming_responses !== false) {
+      const done = await readChatStream(
+        state.messages.slice(-24),
+        controller,
+        event => {
+          if (event.type === "delta") acceptDelta(String(event.text || ""));
+          if (event.type === "tool_result") {
+            acceptDelta(`\n\n${String(event.message || "操作已经完成")}`);
+          }
+          if (event.type === "tool_proposal" && event.proposal) {
+            toolProposal = event.proposal;
+            const risk = event.proposal.risk === "high" ? "高影响操作" : "低风险操作";
+            acceptSilentText(
+              `\n\n操作预览（${risk}）：${String(event.proposal.preview || "未提供说明")}`,
+            );
+          }
+        },
+        options.voiceContext || null,
+      );
+      metrics = done.metrics || null;
+      if (!answer.trim() && done.answer) acceptDelta(String(done.answer));
+    } else {
+      const payload = await fetchJSON("/api/chat", {
+        method: "POST",
+        signal: controller.signal,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: state.messages.slice(-24),
+          voice_context: options.voiceContext || null,
+        }),
+      });
+      acceptDelta(String(payload.answer || ""));
+    }
 
-    const settings = state.bootstrap.settings;
-    if (state.voiceMode || settings.tts.auto_speak) {
-      void speak(answer);
+    if (toolProposal) {
+      setVoiceState("thinking", "等待你确认电脑操作");
+      const approved = window.confirm(
+        `${toolProposal.title || "电脑操作"}\n\n${toolProposal.preview}\n\n是否允许执行？`,
+      );
+      const result = await fetchJSON("/api/tools/resolve", {
+        method: "POST",
+        signal: controller.signal,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          proposal_id: toolProposal.proposal_id,
+          approved,
+        }),
+      });
+      acceptDelta(`\n\n${String(result.message || (approved ? "操作已经完成。" : "操作已取消。"))}`);
+    }
+
+    answer = answer.trim();
+    if (!answer) throw new Error("文字模型没有返回内容");
+    responseMessage.dataset.streaming = "false";
+    state.messages.push({ role: "assistant", content: answer });
+
+    if (speechSession !== null) {
+      const extracted = extractSpeechSegments(speechBuffer, true);
+      for (const segment of extracted.segments) enqueueSpeech(segment, speechSession);
+      closeSpeechStream(speechSession);
     } else if (settings.interaction?.proactive_speech) {
-      const owner = settings.identity.owner_name;
-      void speak(`${owner}，任务已经完成，请查看结果。`);
+      void speak(`${settings.identity.owner_name}，任务已经完成，请查看结果。`);
     } else {
       setVoiceState("idle");
     }
+    if (settings.privacy?.diagnostic_logging && metrics) {
+      console.info("[JARVIS timing]", metrics);
+    }
     return true;
   } catch (error) {
-    thinking.remove();
+    if (speechSession !== null) stopSpeech(false);
+    if (error.name === "AbortError") {
+      if (!answer) responseMessage.remove();
+      else responseMessage.dataset.streaming = "false";
+      setVoiceState("idle", "当前回答已停止");
+      return false;
+    }
+    if (!answer) responseMessage.remove();
+    else responseMessage.dataset.streaming = "false";
     appendMessage("assistant", error.message, { error: true });
     reportVoiceError(error, 700);
     return false;
   } finally {
-    state.busy = false;
-    ui["send-button"].disabled = false;
-    if (!state.voiceMode) ui["message-input"].focus();
+    if (state.chatController === controller) state.chatController = null;
+    if (state.chatSession === chatSession) {
+      state.busy = false;
+      ui["send-button"].disabled = false;
+      if (!state.voiceMode) ui["message-input"].focus();
+    }
   }
 }
 
@@ -364,10 +565,17 @@ function releaseAudioUrl() {
 
 function stopSpeech(setIdle = true) {
   state.speechSession += 1;
+  state.speechQueue = [];
+  state.speechQueueClosed = true;
+  state.speechQueueRunning = false;
+  if (state.speechQueueWake) state.speechQueueWake();
+  state.speechQueueWake = null;
   if (state.speechController) {
     state.speechController.abort();
     state.speechController = null;
   }
+  if (state.speechPlaybackResolve) state.speechPlaybackResolve(false);
+  state.speechPlaybackResolve = null;
   ui["speech-player"].pause();
   ui["speech-player"].removeAttribute("src");
   ui["speech-player"].load();
@@ -383,44 +591,94 @@ function completeSpeechSession(session) {
   if (state.voiceMode) scheduleVoiceResume(420);
 }
 
-function browserSpeak(text, session) {
-  if (!("speechSynthesis" in window)) throw new Error("当前系统不支持系统语音朗读");
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = "zh-CN";
-  utterance.rate = state.bootstrap.settings.tts.speed;
-  const voices = window.speechSynthesis.getVoices();
-  utterance.voice = voices.find(voice => voice.lang.toLowerCase().startsWith("zh")) || null;
-  utterance.onstart = () => {
-    if (session === state.speechSession) setVoiceState("speaking", "正在使用系统语音朗读");
-  };
-  utterance.onend = () => completeSpeechSession(session);
-  utterance.onerror = event => {
-    if (session !== state.speechSession || ["canceled", "interrupted"].includes(event.error)) return;
-    reportVoiceError(new Error(`系统语音朗读失败：${event.error || "未知错误"}`), 700);
-  };
-  window.speechSynthesis.speak(utterance);
-}
-
-async function speak(text = "", isTest = false, previewSettings = null) {
+function beginSpeechStream() {
   clearVoiceResumeTimer();
   pauseVoiceCapture(true);
   stopSpeech(false);
-  const session = state.speechSession + 1;
-  state.speechSession = session;
+  const session = state.speechSession;
+  state.speechQueue = [];
+  state.speechQueueClosed = false;
+  state.speechQueueRunning = false;
+  return session;
+}
+
+function enqueueSpeech(text, session, options = {}) {
+  if (session !== state.speechSession || state.speechQueueClosed) return false;
+  if (!options.isTest && !String(text || "").trim()) return false;
+  state.speechQueue.push({ text, ...options });
+  if (state.speechQueueWake) state.speechQueueWake();
+  state.speechQueueWake = null;
+  if (!state.speechQueueRunning) void drainSpeechQueue(session);
+  return true;
+}
+
+function closeSpeechStream(session) {
+  if (session !== state.speechSession) return;
+  state.speechQueueClosed = true;
+  if (state.speechQueueWake) state.speechQueueWake();
+  state.speechQueueWake = null;
+  if (!state.speechQueueRunning) void drainSpeechQueue(session);
+}
+
+function browserSpeakSegment(text, session, speed) {
+  return new Promise((resolve, reject) => {
+    if (!("speechSynthesis" in window)) {
+      reject(new Error("当前系统不支持系统语音朗读"));
+      return;
+    }
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "zh-CN";
+    utterance.rate = speed;
+    const voices = window.speechSynthesis.getVoices();
+    utterance.voice = voices.find(voice => voice.lang.toLowerCase().startsWith("zh")) || null;
+    const cancelPlayback = () => resolve(false);
+    state.speechPlaybackResolve = cancelPlayback;
+    utterance.onstart = () => {
+      if (session === state.speechSession) setVoiceState("speaking", "正在使用系统语音朗读");
+    };
+    utterance.onend = () => resolve(true);
+    utterance.onerror = event => {
+      if (["canceled", "interrupted"].includes(event.error)) resolve(false);
+      else reject(new Error(`系统语音朗读失败：${event.error || "未知错误"}`));
+    };
+    window.speechSynthesis.speak(utterance);
+  }).finally(() => {
+    if (session === state.speechSession) state.speechPlaybackResolve = null;
+  });
+}
+
+function playCurrentAudio(session) {
+  let ended;
+  let failed;
+  return new Promise((resolve, reject) => {
+    state.speechPlaybackResolve = resolve;
+    ended = () => resolve(true);
+    failed = () => reject(new Error("本地音频播放失败"));
+    ui["speech-player"].addEventListener("ended", ended, { once: true });
+    ui["speech-player"].addEventListener("error", failed, { once: true });
+    ui["speech-player"].play().catch(reject);
+  }).finally(() => {
+    ui["speech-player"].removeEventListener("ended", ended);
+    ui["speech-player"].removeEventListener("error", failed);
+    if (session === state.speechSession) state.speechPlaybackResolve = null;
+  });
+}
+
+async function playSpeechSegment(job, session) {
   const controller = new AbortController();
   state.speechController = controller;
-  setVoiceState("speaking", isTest ? "正在生成试听声音" : "正在本机生成声音");
+  setVoiceState("speaking", job.isTest ? "正在生成试听声音" : "正在生成下一句声音");
 
   try {
     const requestOptions = {
       method: "POST",
       signal: controller.signal,
       headers: { "Content-Type": "application/json" },
-      body: isTest
-        ? JSON.stringify({ settings: previewSettings || state.bootstrap.settings })
-        : JSON.stringify({ text }),
+      body: job.isTest
+        ? JSON.stringify({ settings: job.previewSettings || state.bootstrap.settings })
+        : JSON.stringify({ text: job.text }),
     };
-    const response = await fetch(isTest ? "/api/voice/test" : "/api/tts", requestOptions);
+    const response = await fetch(job.isTest ? "/api/voice/test" : "/api/tts", requestOptions);
     if (!response.ok) {
       const payload = await response.json().catch(() => ({}));
       throw new Error(payload.error || "语音合成失败");
@@ -431,8 +689,8 @@ async function speak(text = "", isTest = false, previewSettings = null) {
     if (contentType.includes("application/json")) {
       const payload = await response.json();
       if (payload.mode !== "browser" || !payload.text) throw new Error("语音服务返回了无效结果");
-      browserSpeak(payload.text, session);
-      return true;
+      const speed = job.previewSettings?.tts?.speed || state.bootstrap.settings.tts.speed;
+      return await browserSpeakSegment(payload.text, session, speed);
     }
 
     const blob = await response.blob();
@@ -440,8 +698,12 @@ async function speak(text = "", isTest = false, previewSettings = null) {
     state.audioUrl = URL.createObjectURL(blob);
     ui["speech-player"].src = state.audioUrl;
     ui["speech-player"].dataset.session = String(session);
-    await ui["speech-player"].play();
-    if (session === state.speechSession) setVoiceState("speaking", "正在播放本地甜美女声");
+    const activeSettings = job.previewSettings || state.bootstrap.settings;
+    if (session === state.speechSession) {
+      setVoiceState("speaking", `正在播放${ttsProviderLabel(activeSettings.tts.provider)}`);
+    }
+    await playCurrentAudio(session);
+    releaseAudioUrl();
     return true;
   } catch (error) {
     if (error.name === "AbortError") return false;
@@ -450,6 +712,45 @@ async function speak(text = "", isTest = false, previewSettings = null) {
   } finally {
     if (state.speechController === controller) state.speechController = null;
   }
+}
+
+async function drainSpeechQueue(session) {
+  if (session !== state.speechSession || state.speechQueueRunning) return;
+  state.speechQueueRunning = true;
+  try {
+    while (session === state.speechSession) {
+      const job = state.speechQueue.shift();
+      if (job) {
+        const played = await playSpeechSegment(job, session);
+        if (!played && session === state.speechSession) {
+          stopSpeech(false);
+          break;
+        }
+        continue;
+      }
+      if (state.speechQueueClosed) break;
+      await new Promise(resolve => {
+        state.speechQueueWake = resolve;
+      });
+    }
+    if (session === state.speechSession && state.speechQueueClosed && !state.speechQueue.length) {
+      completeSpeechSession(session);
+    }
+  } finally {
+    if (session === state.speechSession) state.speechQueueRunning = false;
+  }
+}
+
+async function speak(text = "", isTest = false, previewSettings = null) {
+  const session = beginSpeechStream();
+  if (isTest) {
+    enqueueSpeech("", session, { isTest: true, previewSettings });
+  } else {
+    const extracted = extractSpeechSegments(String(text || ""), true);
+    for (const segment of extracted.segments) enqueueSpeech(segment, session);
+  }
+  closeSpeechStream(session);
+  return true;
 }
 
 function cleanupVoiceAnalysis() {
@@ -463,12 +764,19 @@ function cleanupVoiceAnalysis() {
   ui["voice-level-label"].textContent = "INPUT 00%";
 }
 
-function cleanupRecordingStream() {
+function releaseVoiceCaptureStream() {
+  if (!state.voiceCaptureStream) return;
+  for (const track of state.voiceCaptureStream.getTracks()) track.stop();
+  state.voiceCaptureStream = null;
+}
+
+function cleanupRecordingStream({ releaseDevice = false } = {}) {
   cleanupVoiceAnalysis();
-  if (state.recordingStream) {
+  if (state.recordingStream && state.recordingStream !== state.voiceCaptureStream) {
     for (const track of state.recordingStream.getTracks()) track.stop();
   }
   state.recordingStream = null;
+  if (releaseDevice) releaseVoiceCaptureStream();
   clearInterval(state.recordingTimer);
   state.recordingTimer = null;
   ui["recording-banner"].hidden = true;
@@ -543,7 +851,7 @@ function setupVoiceActivityDetector(stream, cycle) {
         state.noiseFloor = Math.max(0.004, state.noiseFloor * 0.94 + rms * 0.06);
       }
       state.speechCandidateAt = 0;
-      const silenceSeconds = Number(state.bootstrap.settings.interaction?.silence_seconds || 1.2);
+      const silenceSeconds = Number(state.bootstrap.settings.interaction?.silence_seconds || 0.8);
       if (
         state.recordingHasSpeech
         && state.lastVoiceAt
@@ -563,6 +871,8 @@ async function refreshVoiceStatus() {
   try {
     const payload = await fetchJSON("/api/voice/status");
     state.bootstrap.capabilities = payload.capabilities;
+    state.bootstrap.runtime = payload.runtime || state.bootstrap.runtime;
+    state.voiceStatusCheckedAt = Date.now();
     renderSystemState();
   } catch {
     // Keep the last known state if refresh races with desktop shutdown.
@@ -582,20 +892,28 @@ async function startRecording({ automatic = false } = {}) {
   if (state.recorder || state.voiceModeStarting) return false;
   state.voiceModeStarting = automatic;
   try {
-    await refreshVoiceStatus();
+    if (!state.voiceStatusCheckedAt || Date.now() - state.voiceStatusCheckedAt > 30_000) {
+      await refreshVoiceStatus();
+    }
     validateRecordingSupport();
     if (!automatic) stopSpeech(false);
 
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        channelCount: 1,
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-      },
-    });
+    let stream = automatic ? state.voiceCaptureStream : null;
+    const reusable = stream?.getAudioTracks().some(track => track.readyState === "live");
+    if (!reusable) {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+      if (automatic) state.voiceCaptureStream = stream;
+    }
     if (automatic && !state.voiceMode) {
       for (const track of stream.getTracks()) track.stop();
+      if (state.voiceCaptureStream === stream) state.voiceCaptureStream = null;
       return false;
     }
 
@@ -628,7 +946,7 @@ async function startRecording({ automatic = false } = {}) {
     if (automatic) setupVoiceActivityDetector(stream, cycle);
     return true;
   } catch (error) {
-    cleanupRecordingStream();
+    cleanupRecordingStream({ releaseDevice: automatic });
     if (automatic) {
       state.voiceMode = false;
       updateVoiceModeControls();
@@ -691,10 +1009,16 @@ async function finishRecording(purpose, discard, cycle) {
 
     if (state.voiceMode && purpose === "voice") {
       setVoiceState("idle", "已识别，正在发送");
-      await sendMessage(transcript, { voice: true });
+      await sendMessage(transcript, {
+        voice: true,
+        voiceContext: { emotion: payload.emotion || "", language: payload.language || "" },
+      });
     } else if (state.bootstrap.settings.stt.auto_send_transcript) {
       setVoiceState("idle");
-      await sendMessage(transcript, { voice: true });
+      await sendMessage(transcript, {
+        voice: true,
+        voiceContext: { emotion: payload.emotion || "", language: payload.language || "" },
+      });
     } else {
       ui["message-input"].value = transcript;
       resizeComposer();
@@ -715,6 +1039,12 @@ async function finishRecording(purpose, discard, cycle) {
 }
 
 async function toggleRecording() {
+  if (state.chatController || state.voiceState === "speaking") {
+    if (state.chatController) state.chatController.abort();
+    stopSpeech(false);
+    setVoiceState("idle", "已停止当前回答，正在打开麦克风");
+    await Promise.resolve();
+  }
   if (state.voiceMode) await setVoiceMode(false);
   if (state.recorder?.state === "recording") {
     stopRecording();
@@ -731,6 +1061,7 @@ async function setVoiceMode(enabled) {
   if (!next) {
     state.voiceMode = false;
     pauseVoiceCapture(true);
+    releaseVoiceCaptureStream();
     updateVoiceModeControls();
     if (["listening", "transcribing"].includes(state.voiceState)) setVoiceState("idle");
     broadcastState();
@@ -738,6 +1069,7 @@ async function setVoiceMode(enabled) {
   }
 
   state.voiceMode = true;
+  state.voiceStatusCheckedAt = 0;
   updateVoiceModeControls();
   ui["voice-live-transcript"].textContent = "等待你的声音…";
   broadcastState();
@@ -760,11 +1092,40 @@ function refreshConditionalFields() {
   byId("tts-model-hint").textContent = ttsProvider === "sherpa_kokoro"
     ? "完整离线版会自动使用包内 Kokoro 模型，无需填写目录。"
     : "兼容旧版 MeloTTS；默认说话人编号为 0。";
-  const sttDisabled = byId("setting-stt-provider").value === "disabled";
+  const sttProvider = byId("setting-stt-provider").value;
+  const sttDisabled = sttProvider === "disabled";
+  ui["sensevoice-stt-field"].hidden = sttProvider !== "sensevoice";
   ui["stt-detail-fields"].classList.toggle("disabled-fields", sttDisabled);
   for (const control of ui["stt-detail-fields"].querySelectorAll("input, select")) {
     control.disabled = sttDisabled;
   }
+  byId("setting-stt-device").disabled = sttDisabled || sttProvider === "sensevoice";
+}
+
+function selectTtsProviderDefaults() {
+  const provider = byId("setting-tts-provider").value;
+  if (provider === "external") {
+    const voice = byId("setting-external-voice");
+    if (!voice.value.trim() || voice.value.trim().startsWith("zf_")) voice.value = "Vivian";
+    const endpoint = byId("setting-tts-url");
+    if (!endpoint.value.trim()) endpoint.value = "http://127.0.0.1:9880/v1/audio/speech";
+  }
+  refreshConditionalFields();
+}
+
+function selectSttProviderDefaults() {
+  const provider = byId("setting-stt-provider").value;
+  const model = byId("setting-stt-model");
+  const whisperModels = ["tiny", "base", "small", "medium"];
+  if (provider === "sensevoice" && whisperModels.includes(model.value)) {
+    model.value = "SenseVoiceSmall";
+    if (!byId("setting-stt-url").value.trim()) {
+      byId("setting-stt-url").value = "http://127.0.0.1:50000/v1/audio/transcriptions";
+    }
+  } else if (provider === "faster_whisper" && model.value === "SenseVoiceSmall") {
+    model.value = "small";
+  }
+  refreshConditionalFields();
 }
 
 function setSelectValue(select, value) {
@@ -802,7 +1163,7 @@ function creativityLabel(value) {
 function fillSettingsForm() {
   const { settings, secrets } = state.bootstrap;
   const appearance = settings.appearance || { theme: "cyan", panel_opacity: 0.68, floating_opacity: 0.85, floating_window: true };
-  const interaction = settings.interaction || { voice_mode_auto_start: false, proactive_speech: true, silence_seconds: 1.2 };
+  const interaction = settings.interaction || { voice_mode_auto_start: false, proactive_speech: true, silence_seconds: 0.8, streaming_responses: true, prewarm_models: true, computer_control_enabled: false };
   byId("setting-assistant-name").value = settings.identity.assistant_name;
   byId("setting-owner-name").value = settings.identity.owner_name;
   byId("setting-personality").value = settings.identity.personality;
@@ -828,6 +1189,7 @@ function fillSettingsForm() {
   byId("setting-tts-voice").value = settings.tts.voice;
   byId("setting-external-voice").value = settings.tts.voice;
   byId("setting-tts-url").value = settings.tts.external_url;
+  byId("setting-tts-instructions").value = settings.tts.instructions || "";
   byId("setting-auto-speak").checked = settings.tts.auto_speak;
   byId("setting-browser-fallback").checked = settings.tts.browser_fallback;
 
@@ -835,11 +1197,13 @@ function fillSettingsForm() {
   setSelectValue(byId("setting-stt-model"), settings.stt.model);
   byId("setting-stt-device").value = settings.stt.device;
   byId("setting-stt-language").value = settings.stt.language;
+  byId("setting-stt-url").value = settings.stt.external_url || "";
   byId("setting-recording-seconds").value = settings.stt.recording_seconds;
   byId("setting-auto-send-transcript").checked = settings.stt.auto_send_transcript;
 
   byId("setting-voice-mode-auto-start").checked = interaction.voice_mode_auto_start;
   byId("setting-proactive-speech").checked = interaction.proactive_speech;
+  byId("setting-computer-control").checked = interaction.computer_control_enabled;
   byId("setting-silence-seconds").value = interaction.silence_seconds;
   ui["silence-output"].textContent = `${Number(interaction.silence_seconds).toFixed(1)} 秒`;
   byId("setting-theme").value = appearance.theme;
@@ -887,7 +1251,7 @@ function collectSettings() {
     : numberValue("setting-tts-speaker-id", current.tts.speaker_id);
 
   return {
-    version: 4,
+    version: 7,
     identity: {
       assistant_name: byId("setting-assistant-name").value.trim(),
       owner_name: byId("setting-owner-name").value.trim(),
@@ -908,6 +1272,7 @@ function collectSettings() {
       speaker_id: selectedSpeakerId,
       num_threads: numberValue("setting-tts-threads", current.tts.num_threads),
       external_url: byId("setting-tts-url").value.trim(),
+      instructions: byId("setting-tts-instructions").value.trim(),
       browser_fallback: byId("setting-browser-fallback").checked,
       auto_speak: byId("setting-auto-speak").checked,
     },
@@ -916,6 +1281,7 @@ function collectSettings() {
       model: byId("setting-stt-model").value,
       device: byId("setting-stt-device").value,
       language: byId("setting-stt-language").value.trim() || "zh",
+      external_url: byId("setting-stt-url").value.trim(),
       auto_send_transcript: byId("setting-auto-send-transcript").checked,
       recording_seconds: numberValue("setting-recording-seconds", current.stt.recording_seconds),
     },
@@ -928,7 +1294,10 @@ function collectSettings() {
     interaction: {
       voice_mode_auto_start: byId("setting-voice-mode-auto-start").checked,
       proactive_speech: byId("setting-proactive-speech").checked,
-      silence_seconds: numberValue("setting-silence-seconds", current.interaction?.silence_seconds || 1.2),
+      silence_seconds: numberValue("setting-silence-seconds", current.interaction?.silence_seconds || 0.8),
+      streaming_responses: current.interaction?.streaming_responses !== false,
+      prewarm_models: current.interaction?.prewarm_models !== false,
+      computer_control_enabled: byId("setting-computer-control").checked,
     },
     privacy: current.privacy,
   };
@@ -1029,12 +1398,13 @@ function bindEvents() {
   ui["voice-mode-card-button"].addEventListener("click", () => void setVoiceMode(!state.voiceMode));
   ui["voice-mode-end-button"].addEventListener("click", () => void setVoiceMode(false));
   ui["voice-mode-mute-button"].addEventListener("click", () => {
+    if (state.chatController) state.chatController.abort();
     stopSpeech();
     if (state.voiceMode) scheduleVoiceResume(350);
   });
   ui["test-voice-button"].addEventListener("click", () => void testVoice());
-  byId("setting-tts-provider").addEventListener("change", refreshConditionalFields);
-  byId("setting-stt-provider").addEventListener("change", refreshConditionalFields);
+  byId("setting-tts-provider").addEventListener("change", selectTtsProviderDefaults);
+  byId("setting-stt-provider").addEventListener("change", selectSttProviderDefaults);
   byId("setting-temperature").addEventListener("input", event => {
     ui["temperature-output"].textContent = creativityLabel(event.target.value);
   });
@@ -1061,15 +1431,6 @@ function bindEvents() {
     event.preventDefault();
     closeSettings();
   });
-  ui["speech-player"].addEventListener("ended", () => {
-    const session = Number(ui["speech-player"].dataset.session || 0);
-    completeSpeechSession(session);
-  });
-  ui["speech-player"].addEventListener("error", () => {
-    if (state.voiceState === "speaking" && ui["speech-player"].getAttribute("src")) {
-      reportVoiceError(new Error("本地音频播放失败"), 700);
-    }
-  });
   channel?.addEventListener("message", event => {
     const message = event.data || {};
     if (message.type === "toggle-voice-mode") void setVoiceMode(!state.voiceMode);
@@ -1079,7 +1440,8 @@ function bindEvents() {
     state.voiceMode = false;
     clearVoiceResumeTimer();
     if (state.recorder?.state === "recording") stopRecording({ discard: true });
-    cleanupRecordingStream();
+    cleanupRecordingStream({ releaseDevice: true });
+    if (state.chatController) state.chatController.abort();
     stopSpeech(false);
     channel?.close();
   });

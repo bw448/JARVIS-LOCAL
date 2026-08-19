@@ -14,7 +14,7 @@ class ConfigError(ValueError):
     """Raised when user-facing configuration is invalid."""
 
 
-SETTINGS_VERSION = 4
+SETTINGS_VERSION = 7
 DEFAULT_TTS_PROVIDER = "sherpa_kokoro"
 DEFAULT_TTS_VOICE = "zf_xiaoxiao"
 DEFAULT_TTS_SPEAKER_ID = 47
@@ -81,6 +81,7 @@ class TTSConfig:
     speaker_id: int = DEFAULT_TTS_SPEAKER_ID
     num_threads: int = 2
     external_url: str = ""
+    instructions: str = "自然、温和、有陪伴感，像可信赖的私人助理，避免夸张表演。"
     browser_fallback: bool = True
     auto_speak: bool = True
 
@@ -91,6 +92,7 @@ class STTConfig:
     model: str = "small"
     device: str = "cpu"
     language: str = "zh"
+    external_url: str = ""
     auto_send_transcript: bool = False
     recording_seconds: int = 45
 
@@ -113,7 +115,10 @@ class AppearanceConfig:
 class InteractionConfig:
     voice_mode_auto_start: bool = False
     proactive_speech: bool = True
-    silence_seconds: float = 1.2
+    silence_seconds: float = 0.8
+    streaming_responses: bool = True
+    prewarm_models: bool = True
+    computer_control_enabled: bool = False
 
 
 @dataclass(slots=True)
@@ -184,7 +189,7 @@ class Settings:
         )
 
         stt_provider = str(stt_raw.get("provider", "faster_whisper"))
-        if stt_provider not in {"faster_whisper", "disabled"}:
+        if stt_provider not in {"faster_whisper", "sensevoice", "disabled"}:
             raise ConfigError("不支持的语音识别提供商")
 
         stt_device = str(stt_raw.get("device", "cpu"))
@@ -194,6 +199,13 @@ class Settings:
         theme = str(appearance_raw.get("theme", "cyan"))
         if theme not in {"cyan", "violet", "emerald", "amber"}:
             raise ConfigError("界面配色无效")
+
+        silence_value: Any = interaction_raw.get("silence_seconds", 0.8)
+        try:
+            if raw_version <= 4 and float(silence_value) == 1.2:
+                silence_value = 0.8
+        except (TypeError, ValueError):
+            pass
 
         return cls(
             version=SETTINGS_VERSION,
@@ -267,6 +279,12 @@ class Settings:
                     "外部语音服务地址",
                     allow_empty=True,
                 ),
+                instructions=_clean_text(
+                    tts_raw.get("instructions", TTSConfig().instructions),
+                    "语音风格指令",
+                    maximum=300,
+                    allow_empty=True,
+                ),
                 browser_fallback=bool(tts_raw.get("browser_fallback", True)),
                 auto_speak=bool(tts_raw.get("auto_speak", True)),
             ),
@@ -278,6 +296,11 @@ class Settings:
                 device=stt_device,
                 language=_clean_text(
                     stt_raw.get("language", "zh"), "识别语言", maximum=20
+                ),
+                external_url=_http_url(
+                    stt_raw.get("external_url", ""),
+                    "SenseVoice 服务地址",
+                    allow_empty=True,
                 ),
                 auto_send_transcript=bool(
                     stt_raw.get("auto_send_transcript", False)
@@ -315,10 +338,17 @@ class Settings:
                     interaction_raw.get("proactive_speech", True)
                 ),
                 silence_seconds=_number(
-                    interaction_raw.get("silence_seconds", 1.2),
+                    silence_value,
                     "语音停顿时间",
-                    minimum=0.6,
+                    minimum=0.4,
                     maximum=3.0,
+                ),
+                streaming_responses=bool(
+                    interaction_raw.get("streaming_responses", True)
+                ),
+                prewarm_models=bool(interaction_raw.get("prewarm_models", True)),
+                computer_control_enabled=bool(
+                    interaction_raw.get("computer_control_enabled", False)
                 ),
             ),
             privacy=PrivacyConfig(
@@ -332,6 +362,9 @@ class Settings:
             f"你是 {self.identity.assistant_name}，{self.identity.owner_name} 的私人智能助手。"
             f"你的风格是：{self.identity.personality} "
             f"始终称呼用户为“{self.identity.owner_name}”。"
+            "先判断用户是在交办任务、闲聊还是表达情绪。用户倾诉时先用一句自然、具体的话回应感受，"
+            "再提供陪伴或可执行帮助；不要机械复述、过度讨好，也不要假装知道用户没有说过的感受。"
+            "回答的第一句话要简短、口语化、适合直接朗读；任务结果随后再清楚说明。"
             "不要声称自己执行了尚未执行的操作；涉及删除、付款或发送消息时先确认。"
         )
 
