@@ -6,7 +6,7 @@
   <meta name="color-scheme" content="dark">
   <meta name="theme-color" content="#071116">
   <title>JARVIS LOCAL</title>
-  <link rel="icon" href="/static/jarvis-hud-logo.png" type="image/png">
+  <link rel="icon" href="/static/mark.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body data-voice-state="idle" data-voice-mode="false">
@@ -20,7 +20,7 @@
   <div class="app-shell">
     <header class="topbar">
       <a class="brand" href="/" aria-label="JARVIS LOCAL 首页">
-        <span class="brand-mark"><img src="/static/jarvis-hud-logo.png" alt=""></span>
+        <span class="brand-mark"><img src="/static/mark.svg" alt=""></span>
         <span class="brand-copy">
           <strong id="product-name">JARVIS LOCAL</strong>
           <small>PRIVATE SIGNAL DESK <span id="app-version">0.7.0</span></small>
@@ -99,7 +99,7 @@
         <div class="identity-card">
           <div>
             <span class="micro-label">ACTIVE IDENTITY</span>
-            <h1 id="assistant-name">JARVIS</h1>
+            <h1 id="assistant-name"></h1>
             <p id="owner-line">为先生服务</p>
           </div>
           <span class="identity-seal" aria-hidden="true">AI</span>
@@ -128,7 +128,7 @@
         <div class="conversation-heading">
           <div>
             <span class="micro-label">CONVERSATION / 02</span>
-            <h2>和 <span id="conversation-assistant-name">JARVIS</span> 对话</h2>
+            <h2>和 <span id="conversation-assistant-name"></span> 对话</h2>
           </div>
           <div class="session-note">
             <span class="session-lock" aria-hidden="true"></span>
@@ -310,4 +310,5 @@
   <audio id="speech-player" preload="none"></audio>
   <script src="/static/app.js" defer></script>
 </body>
+  </body>
 </html>

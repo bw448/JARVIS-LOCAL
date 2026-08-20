@@ -473,3 +473,91 @@ body[data-voice-state="error"] .signal-bars i { background: var(--warning); tran
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
 }
+
+/* 确保语音模式图案中心没有文字 */
+.hud-monogram { overflow: hidden; }
+.hud-monogram img { display: block; width: 100%; height: 100%; }
+
+/* 隐藏主界面助手名字，改为纯图标 */
+.identity-card h1#assistant-name {
+  display: none;
+}
+
+/* 添加纯图标替代 */
+.identity-card > div::before {
+  content: "";
+  display: block;
+  width: 36px;
+  height: 36px;
+  background-image: url("/static/mark.svg");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  margin: 0 auto 10px;
+}
+
+/* 调整identity-card布局 */
+.identity-card {
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.identity-card > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.identity-card p {
+  margin-top: 5px;
+}
+
+.identity-card .identity-seal {
+  display: none;
+}
+
+/* 隐藏对话区域中的助手名字 */
+.conversation-heading h2 span#conversation-assistant-name {
+  display: none;
+}
+
+/* 替换为固定文字 */
+.conversation-heading h2 {
+  font-size: 0;
+}
+
+.conversation-heading h2::before {
+  content: "对话";
+  font-size: 13px;
+}
+
+.conversation-heading h2::after {
+  content: "";
+}
+
+/* 隐藏owner-line，改为固定文字 */
+.identity-card p#owner-line {
+  display: none;
+}
+
+.identity-card p#owner-line::before {
+  content: "为用户服务";
+  display: block;
+}
+
+/* 强制清除语音模式中央的所有文字 */
+#voice-hud-monogram,
+#voice-hud-monogram * {
+  color: transparent !important;
+  font-size: 0 !important;
+  text-shadow: none !important;
+  -webkit-text-fill-color: transparent !important;
+}
+
+#voice-hud-monogram img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  opacity: 1;
+}

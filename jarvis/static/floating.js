@@ -167,3 +167,19 @@ void (async () => {
   if (hostState && typeof hostState === "object") applyHostState(hostState);
   channel?.postMessage({ type: "request-state" });
 })();
+
+// 强制清除所有可能显示助手名字的元素
+(function() {
+  function cleanMonograms() {
+    document.querySelectorAll('.hud-name, #float-monogram').forEach(el => {
+      // 保留 img 子元素，清除其他文字
+      const img = el.querySelector('img');
+      if (img) {
+        el.textContent = '';
+        el.appendChild(img);
+      }
+    });
+  }
+  cleanMonograms();
+  setInterval(cleanMonograms, 500);
+})();

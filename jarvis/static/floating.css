@@ -166,13 +166,6 @@ body[data-active="true"] .hud-emblem { filter: drop-shadow(0 14px 24px rgba(0,0,
 .core-status { color: rgba(209, 245, 247, .76); font-size: 7px; font-weight: 650; letter-spacing: .08em; }
 .core-mode { color: rgba(163, 205, 211, .42); font-size: 5.5px; }
 
-.float-wave { position: relative; z-index: 2; height: 18px; display: none; align-items: center; justify-content: center; gap: 3px; }
-.float-wave i { width: 2px; height: 10px; border-radius: 2px; background: var(--hud); box-shadow: 0 0 6px rgba(var(--hud-rgb), .5); animation: float-wave .62s ease-in-out infinite alternate; }
-.float-wave i:nth-child(2) { height: 16px; animation-delay: -.37s; }
-.float-wave i:nth-child(3) { height: 22px; animation-delay: -.18s; }
-.float-wave i:nth-child(4) { height: 14px; animation-delay: -.48s; }
-.float-wave i:nth-child(5) { animation-delay: -.29s; }
-
 .orbit-control,
 .edge-rail { border: 0; color: inherit; cursor: pointer; }
 .orbit-control {
@@ -231,19 +224,13 @@ body[data-collapsed="true"] .edge-rail { opacity: .94; pointer-events: auto; tra
 body[data-edge="left"] .edge-chevrons i { transform: rotate(-135deg); }
 
 body[data-voice-mode="true"] .hud-core { border-color: rgba(var(--hud-rgb), .72); background: radial-gradient(circle, rgba(var(--hud-rgb), .18), rgba(2, 21, 27, .74) 62%); box-shadow: inset 0 0 31px rgba(var(--hud-rgb), .12), 0 0 23px rgba(var(--hud-rgb), .18); }
-body[data-state="listening"] .hud-name,
-body[data-state="speaking"] .hud-name { display: none; }
-body[data-state="listening"] .float-wave,
-body[data-state="speaking"] .float-wave { display: flex; }
 body[data-state="listening"] .rotor-a,
 body[data-state="speaking"] .rotor-a { animation-duration: 3.2s; border-color: rgba(var(--hud-rgb), .76); }
 body[data-state="thinking"] .rotor-b { animation-duration: 2.3s; border-color: rgba(var(--hud-rgb), .72); }
 body[data-state="thinking"] .hud-core { animation: core-breathe 1.25s ease-in-out infinite; }
-body[data-state="speaking"] .float-wave i { animation-duration: .4s; }
 body[data-state="error"] { --hud: #ff876d; --hud-rgb: 255, 135, 109; --hud-deep: #8b3528; }
 
 @keyframes hud-turn { to { transform: rotate(360deg); } }
-@keyframes float-wave { from { transform: scaleY(.34); opacity: .5; } to { transform: scaleY(1); opacity: 1; } }
 @keyframes core-breathe { 50% { transform: translate(-50%, -50%) scale(.965); } }
 
 @media (pointer: coarse) {

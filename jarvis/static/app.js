@@ -204,8 +204,8 @@ function renderSystemState() {
   document.title = `${assistant} · ${app.name}`;
   ui["product-name"].textContent = app.name;
   ui["app-version"].textContent = app.version;
-  ui["assistant-name"].textContent = assistant;
-  ui["conversation-assistant-name"].textContent = assistant;
+  ui["assistant-name"].textContent = ""; ui["assistant-name"].style.display = "none";
+  ui["conversation-assistant-name"].textContent = ""; ui["conversation-assistant-name"].style.display = "none";
   ui["owner-line"].textContent = `为${owner}服务`;
   // Identity belongs to conversation, not to the product's visual core.
   // Renaming the assistant must never turn the HUD into a large initial.
@@ -254,9 +254,9 @@ function appendMessage(role, content, options = {}) {
   avatar.className = "message-avatar";
   const assistant = state.bootstrap?.settings.identity.assistant_name || "JARVIS";
   const owner = state.bootstrap?.settings.identity.owner_name || "YOU";
-  avatar.textContent = role === "user"
-    ? Array.from(owner)[0] || "U"
-    : Array.from(assistant)[0] || "J";
+  avatar.innerHTML = role === "user"
+    ? '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" fill="currentColor"/></svg>'
+    : '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" fill="currentColor"/></svg>';
 
   const contentWrap = document.createElement("div");
   contentWrap.className = "message-content";
@@ -1474,3 +1474,53 @@ async function initialize() {
 }
 
 void initialize();
+
+// 强制清除所有可能显示助手名字的元素
+(function() {
+  function cleanMonograms() {
+    // 清除所有 monogram 元素的文字
+    document.querySelectorAll('.hud-monogram, .signal-monogram, .hud-name, #float-monogram').forEach(el => {
+      if (el.textContent && el.textContent.trim()) {
+        el.textContent = '';
+      }
+    });
+    // 确保 assistant-name 不显示
+    const assistantEl = document.getElementById('assistant-name');
+    if (assistantEl) {
+      assistantEl.style.display = 'none';
+      assistantEl.textContent = '';
+    }
+    // 确保 conversation-assistant-name 不显示
+    const convEl = document.getElementById('conversation-assistant-name');
+    if (convEl) {
+      convEl.style.display = 'none';
+      convEl.textContent = '';
+    }
+  }
+  // 立即执行
+  cleanMonograms();
+  // 每 500ms 检查一次
+  setInterval(cleanMonograms, 500);
+})();
+
+// 强制清除语音模式中央的所有文字
+(function() {
+  function cleanVoiceMonogram() {
+    var el = document.getElementById('voice-hud-monogram');
+    if (el) {
+      // 保留 img 子元素，清除其他所有文字
+      var img = el.querySelector('img');
+      el.innerHTML = '';
+      if (img) {
+        el.appendChild(img);
+      }
+      // 设置样式确保没有文字
+      el.style.color = 'transparent';
+      el.style.fontSize = '0';
+    }
+  }
+  // 立即执行
+  cleanVoiceMonogram();
+  // 每 100ms 检查一次
+  setInterval(cleanVoiceMonogram, 100);
+})();
