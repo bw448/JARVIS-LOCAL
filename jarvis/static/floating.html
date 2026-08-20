@@ -18,15 +18,24 @@
       <span class="hud-sweep" aria-hidden="true"></span>
       <span class="hud-crosshair" aria-hidden="true"></span>
       <span class="amber-beacon" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span class="status-indicator" aria-hidden="true"></span>
 
       <div id="widget-drag-handle" class="hud-drag pywebview-drag-region" title="拖动并自动吸附屏幕边缘"></div>
 
       <button id="float-action" class="hud-core no-drag" type="button" aria-label="开启连续语音模式" aria-pressed="false">
         <span class="core-reticle" aria-hidden="true"></span>
         <strong id="float-monogram" class="hud-name"><img src="/static/mark.svg" alt=""></strong>
+        <canvas id="voice-waveform" class="voice-waveform" width="120" height="40" aria-hidden="true"></canvas>
         <span id="float-status-label" class="core-status">系统待命</span>
         <span id="float-mode-label" class="core-mode">点击核心开始对话</span>
       </button>
+
+      <div class="theme-switcher" aria-label="主题切换">
+        <button class="theme-btn" data-theme="cyan" title="青色主题" aria-label="青色主题"></button>
+        <button class="theme-btn" data-theme="violet" title="紫色主题" aria-label="紫色主题"></button>
+        <button class="theme-btn" data-theme="emerald" title="翠绿主题" aria-label="翠绿主题"></button>
+        <button class="theme-btn" data-theme="amber" title="琥珀主题" aria-label="琥珀主题"></button>
+      </div>
 
       <button id="float-hide" class="orbit-control control-close no-drag" type="button" title="隐藏悬浮助手" aria-label="隐藏悬浮助手">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg>

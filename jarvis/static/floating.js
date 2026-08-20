@@ -183,3 +183,129 @@ void (async () => {
   cleanMonograms();
   setInterval(cleanMonograms, 500);
 })();
+
+// Voice Waveform Visualization
+class VoiceWaveform {
+  constructor(canvasId) {
+    this.canvas = document.getElementById(canvasId);
+    if (!this.canvas) return;
+    this.ctx = this.canvas.getContext("2d");
+    this.width = this.canvas.width;
+    this.height = this.canvas.height;
+    this.bars = 24;
+    this.barWidth = this.width / this.bars - 2;
+    this.animationId = null;
+    this.isActive = false;
+    this.frequencies = new Array(this.bars).fill(0);
+    this.targetFrequencies = new Array(this.bars).fill(0);
+    this.phase = 0;
+  }
+
+  start() {
+    if (this.isActive) return;
+    this.isActive = true;
+    this.animate();
+  }
+
+  stop() {
+    this.isActive = false;
+    if (this.animationId) {
+      cancelAnimationFrame(this.animationId);
+      this.animationId = null;
+    }
+    this.clear();
+  }
+
+  clear() {
+    if (!this.ctx) return;
+    this.ctx.clearRect(0, 0, this.width, this.height);
+  }
+
+  generateFrequencies() {
+    this.phase += 0.05;
+    for (let i = 0; i < this.bars; i++) {
+      const base = Math.sin(this.phase + i * 0.3) * 0.3 + 0.5;
+      const noise = Math.random() * 0.4;
+      this.targetFrequencies[i] = Math.min(1, base + noise);
+    }
+  }
+
+  animate() {
+    if (!this.isActive) return;
+
+    this.generateFrequencies();
+
+    // Smooth interpolation
+    for (let i = 0; i < this.bars; i++) {
+      this.frequencies[i] += (this.targetFrequencies[i] - this.frequencies[i]) * 0.15;
+    }
+
+    this.draw();
+    this.animationId = requestAnimationFrame(() => this.animate());
+  }
+
+  draw() {
+    if (!this.ctx) return;
+
+    this.ctx.clearRect(0, 0, this.width, this.height);
+
+    const style = getComputedStyle(document.documentElement);
+    const hudColor = style.getPropertyValue("--hud").trim() || "#54f4ee";
+    const hudRgb = style.getPropertyValue("--hud-rgb").trim() || "84, 244, 238";
+
+    for (let i = 0; i < this.bars; i++) {
+      const x = i * (this.barWidth + 2) + 1;
+      const barHeight = this.frequencies[i] * this.height * 0.8;
+      const y = (this.height - barHeight) / 2;
+
+      const gradient = this.ctx.createLinearGradient(x, y, x, y + barHeight);
+      gradient.addColorStop(0, `rgba(${hudRgb}, 0.9)`);
+      gradient.addColorStop(0.5, `rgba(${hudRgb}, 0.7)`);
+      gradient.addColorStop(1, `rgba(${hudRgb}, 0.5)`);
+
+      this.ctx.fillStyle = gradient;
+      this.ctx.beginPath();
+      this.ctx.roundRect(x, y, this.barWidth, barHeight, 2);
+      this.ctx.fill();
+
+      // Glow effect
+      this.ctx.shadowColor = hudColor;
+      this.ctx.shadowBlur = 4;
+      this.ctx.fill();
+      this.ctx.shadowBlur = 0;
+    }
+  }
+}
+
+// Initialize voice waveform
+const voiceWaveform = new VoiceWaveform("voice-waveform");
+
+// Update applyState to control waveform
+const originalApplyState = applyState;
+applyState = function(payload = {}) {
+  originalApplyState(payload);
+  
+  const voiceState = payload.voiceState || "idle";
+  if (voiceState === "listening" || voiceState === "speaking") {
+    voiceWaveform.start();
+  } else {
+    voiceWaveform.stop();
+  }
+};
+
+// Theme Switcher
+document.querySelectorAll('.theme-btn').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const theme = btn.dataset.theme;
+    document.body.dataset.theme = theme;
+    localStorage.setItem('jarvis-theme', theme);
+    channel?.postMessage({ type: 'theme-change', theme });
+  });
+});
+
+// Load saved theme
+const savedTheme = localStorage.getItem('jarvis-theme');
+if (savedTheme) {
+  document.body.dataset.theme = savedTheme;
+}

@@ -243,3 +243,104 @@ body[data-state="error"] { --hud: #ff876d; --hud-rgb: 255, 135, 109; --hud-deep:
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+/* Voice Waveform Visualization */
+.voice-waveform {
+  position: relative;
+  z-index: 2;
+  width: 120px;
+  height: 40px;
+  display: none;
+  margin: 4px auto;
+  opacity: 0.9;
+}
+
+body[data-state="listening"] .voice-waveform,
+body[data-state="speaking"] .voice-waveform {
+  display: block;
+}
+
+body[data-state="listening"] .hud-name,
+body[data-state="speaking"] .hud-name {
+  display: none;
+}
+
+/* Theme Switcher */
+.theme-switcher {
+  position: absolute;
+  bottom: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: none;
+  gap: 6px;
+  z-index: 10;
+}
+
+body[data-active="true"] .theme-switcher {
+  display: flex;
+}
+
+.theme-btn {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  transition: transform 200ms ease, border-color 200ms ease;
+}
+
+.theme-btn:hover {
+  transform: scale(1.2);
+  border-color: rgba(255, 255, 255, 0.8);
+}
+
+.theme-btn[data-theme="cyan"] { background: #54f4ee; }
+.theme-btn[data-theme="violet"] { background: #b4a8ff; }
+.theme-btn[data-theme="emerald"] { background: #65efbd; }
+.theme-btn[data-theme="amber"] { background: #ffd078; }
+
+/* Enhanced Animations */
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+body[data-state="listening"] .ambient-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+body[data-state="speaking"] .ambient-glow {
+  animation: pulse-glow 1.5s ease-in-out infinite;
+}
+
+/* Status Indicator */
+.status-indicator {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #4ade80;
+  box-shadow: 0 0 6px rgba(74, 222, 128, 0.6);
+  opacity: 0;
+  transition: opacity 300ms ease;
+}
+
+body[data-state="listening"] .status-indicator,
+body[data-state="speaking"] .status-indicator {
+  opacity: 1;
+  animation: pulse-glow 1s ease-in-out infinite;
+}
+
+body[data-state="thinking"] .status-indicator {
+  background: #fbbf24;
+  box-shadow: 0 0 6px rgba(251, 191, 36, 0.6);
+  opacity: 1;
+}
+
+body[data-state="error"] .status-indicator {
+  background: #ef4444;
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.6);
+  opacity: 1;
+}
