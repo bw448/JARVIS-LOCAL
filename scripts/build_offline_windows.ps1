@@ -19,7 +19,7 @@ $TtsModel = Join-Path $TtsRoot "kokoro-multi-lang-v1_0"
 $SttModel = Join-Path $ModelRoot "stt\faster-whisper-small"
 $PrerequisiteRoot = Join-Path $AssetRoot "prerequisites"
 $DistRoot = Join-Path $ProjectRoot "dist"
-$ReleaseName = "JARVIS-LOCAL-0.7.0-Windows-x64-Offline"
+$ReleaseName = "JARVIS-LOCAL-0.7.1-Windows-x64-Offline"
 $ReleaseDirectory = Join-Path $DistRoot $ReleaseName
 $ArchivePath = Join-Path $DistRoot "$ReleaseName.zip"
 
@@ -204,7 +204,7 @@ $PackageLines = @(
     $PackageList -split "`r?`n" |
         Where-Object { $_ -and $_ -notmatch '^# Editable install' -and $_ -notmatch '^-e\s+' }
 )
-$PackageLines += "jarvis-assistant==0.7.0"
+$PackageLines += "jarvis-assistant==0.7.1"
 $SanitizedPackageList = ($PackageLines | Sort-Object -Unique) -join "`r`n"
 [System.IO.File]::WriteAllText(
     (Join-Path $ReleaseDirectory "PYTHON-PACKAGES.txt"),
@@ -215,7 +215,7 @@ $PythonVersion = (Invoke-NativeCapture $PythonExe @("--version")).Trim()
 
 $BuildInfo = [ordered]@{
     app = "JARVIS LOCAL"
-    version = "0.7.0"
+    version = "0.7.1"
     edition = "Windows x64 complete offline voice"
     built_at = (Get-Date).ToUniversalTime().ToString("o")
     python = $PythonVersion
