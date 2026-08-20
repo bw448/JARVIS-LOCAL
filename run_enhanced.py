@@ -1,56 +1,55 @@
 """
-增强版启动脚本
-使用Computer Use和语音优化功能
+Run JARVIS LOCAL Enhanced v1.1.0
+集成 Memory、Skills、Web Search、Document Processing
 """
 
-from __future__ import annotations
-
+import sys
 import argparse
-import os
-import threading
-import webbrowser
+from pathlib import Path
 
-from jarvis.app_enhanced import create_enhanced_server
+# Add project root to path
+sys.path.insert(0, str(Path(__file__).parent))
 
-
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Start the JARVIS LOCAL assistant")
-    parser.add_argument("--host", default=os.environ.get("JARVIS_HOST", "127.0.0.1"))
-    parser.add_argument(
-        "--port", type=int, default=int(os.environ.get("JARVIS_PORT", "8765"))
-    )
-    parser.add_argument("--no-browser", action="store_true")
-    return parser.parse_args()
+from jarvis.app_enhanced import run_enhanced_server
+from jarvis.config import SettingsStore, default_data_dir
 
 
-def main() -> None:
-    args = parse_args()
-    server = None
-    last_error: OSError | None = None
-    for candidate_port in range(args.port, min(args.port + 20, 65_536)):
-        try:
-            server = create_enhanced_server(args.host, candidate_port)
-            break
-        except OSError as exc:
-            last_error = exc
-    if server is None:
-        raise SystemExit(f"无法启动本地服务：{last_error}")
-    server.application.start_prewarm()
+def main():
+    parser = argparse.ArgumentParser(description="JARVIS LOCAL Enhanced")
+    parser.add_argument("--host", default="127.0.0.1", help="Server host")
+    parser.add_argument("--port", type=int, default=8080, help="Server port")
+    parser.add_argument("--data-dir", type=str, help="Data directory")
+    args = parser.parse_args()
 
-    host, port = server.server_address[:2]
-    browser_host = "127.0.0.1" if host in {"0.0.0.0", "::"} else host
-    url = f"http://{browser_host}:{port}/"
-    print(f"JARVIS LOCAL 已启动：{url}")
-    print("按 Ctrl+C 退出。对话正文默认不写入日志。")
-    print("性能监控：http://127.0.0.1:{port}/api/performance")
-    if not args.no_browser:
-        threading.Timer(0.5, lambda: webbrowser.open(url)).start()
+    print("""
+    ╔═══════════════════════════════════════════════════════════╗
+    ║           JARVIS LOCAL Enhanced v1.1.0                   ║
+    ║  ─────────────────────────────────────────────────────── ║
+    ║  ✨ Memory System - 记忆对话和重要信息                   ║
+    ║  🔧 Skills System - 专业技能增强                         ║
+    ║  🔍 Web Search - 互联网搜索能力                          ║
+    ║  📄 Document Processing - 文档处理能力                    ║
+    ║  🎤 Voice System - 本地语音识别和合成                     ║
+    ╚═══════════════════════════════════════════════════════════╝
+    """)
+
+    data_dir = Path(args.data_dir) if args.data_dir else None
+    
+    print(f"[JARVIS] Starting enhanced server on http://{args.host}:{args.port}")
+    print(f"[JARVIS] Data directory: {data_dir or default_data_dir() / 'jarvis_data'}")
+    print(f"[JARVIS] Press Ctrl+C to stop")
+    print()
+
     try:
-        server.serve_forever(poll_interval=0.25)
+        run_enhanced_server(
+            host=args.host,
+            port=args.port,
+        )
     except KeyboardInterrupt:
-        print("\nJARVIS LOCAL 正在退出…")
-    finally:
-        server.server_close()
+        print("\n[JARVIS] Server stopped.")
+    except Exception as e:
+        print(f"\n[JARVIS] Error: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
