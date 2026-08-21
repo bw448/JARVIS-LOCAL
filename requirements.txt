@@ -1,0 +1,21 @@
+# JARVIS LOCAL 依赖
+# 基础依赖
+pydantic>=2.12,<3
+keyring>=25,<27
+
+# 语音合成 (TTS)
+sherpa-onnx>=1.13,<2
+kokoro>=0.9.4,<1
+misaki[zh]
+numpy>=1.26
+soundfile>=0.12
+
+# 语音识别 (STT)
+faster-whisper>=1.1,<2
+
+# 桌面 UI
+pywebview>=5,<7
+Pillow>=11,<13
+
+# DeepSeek Harness (可选)
+# deepseek-harness-sdk>=0.1.0

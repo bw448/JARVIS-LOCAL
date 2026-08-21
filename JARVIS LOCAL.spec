@@ -2,10 +2,10 @@
 
 
 a = Analysis(
-    ['desktop.py'],
+    ['run.py'],
     pathex=[],
     binaries=[],
-    datas=[('jarvis/static', 'jarvis/static'), ('dist/JARVIS-LOCAL-0.7.0-Windows-x64-Offline/_internal/models', 'models')],
+    datas=[],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -19,27 +19,20 @@ pyz = PYZ(a.pure)
 exe = EXE(
     pyz,
     a.scripts,
+    a.binaries,
+    a.datas,
     [],
-    exclude_binaries=True,
     name='JARVIS LOCAL',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=False,
+    upx_exclude=[],
+    runtime_tmpdir=None,
+    console=True,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['.build-windows\\assets\\jarvis.ico'],
-)
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.datas,
-    strip=False,
-    upx=True,
-    upx_exclude=[],
-    name='JARVIS LOCAL',
 )

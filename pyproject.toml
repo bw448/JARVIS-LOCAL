@@ -4,15 +4,19 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "jarvis-assistant"
-version = "1.1.0"
-description = "An original, local-first personal voice assistant."
+version = "1.2.0"
+description = "An original, local-first personal voice assistant with DeepSeek Harness integration."
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
 dependencies = [
   "keyring>=25,<27",
+  "pydantic>=2.12,<3",
 ]
 
 [project.optional-dependencies]
+dsh = [
+  "deepseek-harness-sdk>=0.1.0",
+]
 sherpa = [
   "sherpa-onnx>=1.13,<2",
 ]
@@ -40,6 +44,17 @@ voice-full = [
   "misaki[zh]",
   "numpy>=1.26",
   "soundfile>=0.12",
+]
+all = [
+  "deepseek-harness-sdk>=0.1.0",
+  "sherpa-onnx>=1.13,<2",
+  "faster-whisper>=1.1,<2",
+  "kokoro>=0.9.4,<1",
+  "misaki[zh]",
+  "numpy>=1.26",
+  "soundfile>=0.12",
+  "pywebview>=5,<7",
+  "Pillow>=11,<13",
 ]
 
 [tool.setuptools]

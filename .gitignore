@@ -1,29 +1,43 @@
+# Python
 __pycache__/
 *.py[cod]
+*.pyo
 .pytest_cache/
 .venv/
-.build-windows/
+venv/
+*.egg-info/
 dist/
 build/
-*.egg-info/
-.jarvis-data/
+
+# 构建资源 (太大，不上传)
+.build-windows/
 models/
+
+# 运行时数据
+.jarvis-data/
 *.wav
 *.mp3
-.env
-
-# Local desktop/runtime diagnostics and browser test profiles.
-.desktop-*.txt
-.desktop-*.json
-.desktop-test-data/
-.edge-cdp-profile/
-.tmp-cdp/
 *.log
 *.sqlite
 *.sqlite3
 
-# Local editor and operating-system metadata.
+# 环境变量
+.env
+.env.local
+
+# IDE
 .idea/
 .vscode/
+*.swp
+*.swo
+
+# 系统文件
 .DS_Store
 Thumbs.db
+desktop.ini
+
+# 临时文件
+*.tmp
+*.bak
+*~
+.tmp/

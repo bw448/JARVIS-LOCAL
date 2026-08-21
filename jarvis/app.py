@@ -12,6 +12,7 @@ from urllib.parse import unquote, urlparse
 
 from . import __version__
 from .brain import BrainError, OpenAICompatibleBrain, normalize_messages
+from .brain_deepseek import DeepSeekHarnessBrain, HybridBrain, DSHBrainConfig
 from .config import ConfigError, Settings, SettingsStore
 from .computer import ComputerToolError, ComputerToolService
 from .secrets import SecretStore, SecretStoreError
@@ -56,10 +57,28 @@ class JarvisApplication:
         self.settings_store = settings_store or SettingsStore()
         self.secret_store = secret_store or SecretStore()
         self.speech = SpeechService()
-        self.brain = OpenAICompatibleBrain()
         self.computer = ComputerToolService()
         self._lock = threading.RLock()
         self._settings = self.settings_store.load()
+        
+        # Initialize brain with DeepSeek Harness support
+        settings = self._settings
+        dsh_config = DSHBrainConfig(
+            enabled=settings.dsh.enabled,
+            model=settings.dsh.model,
+            provider=settings.dsh.provider,
+            max_tokens=settings.dsh.max_tokens,
+            runtime_bin=settings.dsh.runtime_bin or None,
+            session_root=settings.dsh.session_root or None,
+            cordis_config=settings.dsh.cordis_config or None,
+            base_url=settings.dsh.base_url or None,
+            api_key=settings.dsh.api_key or None,
+            request_timeout=settings.dsh.request_timeout,
+            shutdown_timeout=settings.dsh.shutdown_timeout,
+            fallback_to_openai=settings.dsh.fallback_to_openai,
+            env_overrides=settings.dsh.env_overrides,
+        )
+        self.brain = HybridBrain(OpenAICompatibleBrain(), dsh_config)
         self._prewarm_lock = threading.Lock()
         self._prewarm_generation = 0
         self._prewarm_state: dict[str, Any] = {
@@ -97,6 +116,14 @@ class JarvisApplication:
         ):
             capabilities["tts"]["ready"] = False
             capabilities["tts"]["reason"] = "worker_unreachable"
+        
+        # Add brain information
+        capabilities["brain"] = {
+            "active": self.brain.active_brain,
+            "dsh_enabled": settings.dsh.enabled,
+            "dsh_available": self.brain._dsh_brain.is_available if self.brain._dsh_brain else False,
+        }
+        
         return capabilities
 
     def public_state(self) -> dict[str, Any]:

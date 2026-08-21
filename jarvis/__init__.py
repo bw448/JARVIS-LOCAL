@@ -1,9 +1,9 @@
 """
 JARVIS LOCAL - 私人语音助手
-版本 1.1.0 - P2 完成
+版本 1.2.0 - DeepSeek Harness 集成
 """
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 __app_name__ = "JARVIS LOCAL"
 
 # 基础模块
@@ -27,3 +27,6 @@ from .multimodal import MultimodalService, ImageProcessor, OCRService, get_multi
 from .canvas import CanvasWorkbench, CanvasType, get_canvas_workbench
 from .messaging import MessagingManager, get_messaging_manager
 from .llm_local import LocalLLMService, LLMConfig, get_llm_service
+
+# 模型下载器
+from .model_downloader import check_models, ensure_models

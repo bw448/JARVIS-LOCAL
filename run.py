@@ -1,50 +1,48 @@
-from __future__ import annotations
+#!/usr/bin/env python3
+"""JARVIS LOCAL 启动入口"""
 
-import argparse
-import os
-import threading
-import webbrowser
+import sys
+from pathlib import Path
 
-from jarvis.app import create_server
-
-
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Start the JARVIS LOCAL assistant")
-    parser.add_argument("--host", default=os.environ.get("JARVIS_HOST", "127.0.0.1"))
-    parser.add_argument(
-        "--port", type=int, default=int(os.environ.get("JARVIS_PORT", "8765"))
-    )
-    parser.add_argument("--no-browser", action="store_true")
-    return parser.parse_args()
+# 确保当前目录在路径中
+sys.path.insert(0, str(Path(__file__).parent))
 
 
-def main() -> None:
-    args = parse_args()
-    server = None
-    last_error: OSError | None = None
-    for candidate_port in range(args.port, min(args.port + 20, 65_536)):
-        try:
-            server = create_server(args.host, candidate_port)
-            break
-        except OSError as exc:
-            last_error = exc
-    if server is None:
-        raise SystemExit(f"无法启动本地服务：{last_error}")
-    server.application.start_prewarm()
-
-    host, port = server.server_address[:2]
-    browser_host = "127.0.0.1" if host in {"0.0.0.0", "::"} else host
-    url = f"http://{browser_host}:{port}/"
-    print(f"JARVIS LOCAL 已启动：{url}")
-    print("按 Ctrl+C 退出。对话正文默认不写入日志。")
-    if not args.no_browser:
-        threading.Timer(0.5, lambda: webbrowser.open(url)).start()
+def main():
+    # 检查是否首次运行
     try:
-        server.serve_forever(poll_interval=0.25)
+        from jarvis.first_run import check_tts_model, check_stt_model, setup_first_run
+        
+        if not check_tts_model() or not check_stt_model():
+            print("\n检测到语音模型缺失，需要下载才能使用完整功能")
+            choice = input("是否现在下载？(y/n): ").strip().lower()
+            if choice == 'y':
+                setup_first_run()
+            else:
+                print("跳过下载，语音功能将受限\n")
+    except Exception as e:
+        print(f"首次运行检查失败: {e}")
+    
+    # 启动应用
+    try:
+        from jarvis.app import JarvisApplication
+        from jarvis.config import SettingsStore
+        
+        store = SettingsStore()
+        app = JarvisApplication(settings_store=store)
+        
+        print(f"\n{'='*50}")
+        print(f"JARVIS LOCAL v{app.settings.identity.assistant_name}")
+        print(f"{'='*50}")
+        print(f"访问 http://127.0.0.1:8080 开始使用")
+        print(f"{'='*50}\n")
+        
+        app.run()
     except KeyboardInterrupt:
-        print("\nJARVIS LOCAL 正在退出…")
-    finally:
-        server.server_close()
+        print("\n再见！")
+    except Exception as e:
+        print(f"\n启动失败: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
