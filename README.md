@@ -1,12 +1,12 @@
-<p align="center">
-  <img src="assets/jarvis-app-icon-3d-v3.png" width="160" alt="JARVIS LOCAL Logo">
-</p>
+<div align="center">
 
-<h1 align="center">JARVIS LOCAL</h1>
+![JARVIS LOCAL Logo](assets/jarvis-app-icon-3d-v3.png)
 
-<p align="center">
-  <strong>本地优先的 AI 语音助手 · 完全离线运行 · 你的私人 JARVIS</strong>
-</p>
+# JARVIS LOCAL
+
+**本地优先的 AI 语音助手 · 完全离线运行 · 你的私人 JARVIS**
+
+</div>
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-1.2.0-cyan?style=for-the-badge" alt="Version">
