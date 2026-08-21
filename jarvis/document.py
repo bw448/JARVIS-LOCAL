@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 
-@dataclass(slots=True)
+@dataclass
 class DocumentResult:
     """Result from document processing."""
     success: bool

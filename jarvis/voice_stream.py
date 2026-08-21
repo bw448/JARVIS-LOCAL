@@ -32,7 +32,7 @@ class StreamState(Enum):
     DISCONNECTED = "disconnected"
 
 
-@dataclass(slots=True)
+@dataclass
 class AudioChunk:
     """音频数据块"""
     data: bytes
@@ -42,7 +42,7 @@ class AudioChunk:
     sample_width: int = 2  # 16-bit
 
 
-@dataclass(slots=True)
+@dataclass
 class TranscriptSegment:
     """识别结果片段"""
     text: str
@@ -53,7 +53,7 @@ class TranscriptSegment:
     end_time: float = 0.0
 
 
-@dataclass(slots=True)
+@dataclass
 class StreamEvent:
     """流事件"""
     type: str  # "transcript", "audio", "state", "error", "interrupt"

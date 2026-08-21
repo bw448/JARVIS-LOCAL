@@ -18,7 +18,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from .memory import MemoryEntry, MemoryStore
 
 
-@dataclass(slots=True)
+@dataclass
 class VectorEntry:
     """带向量的记忆条目"""
     memory: MemoryEntry

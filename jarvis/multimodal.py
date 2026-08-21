@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Optional, Union
 from io import BytesIO
 
 
-@dataclass(slots=True)
+@dataclass
 class ImageInfo:
     """图片信息"""
     path: Optional[str]
@@ -48,7 +48,7 @@ class ImageInfo:
         }
 
 
-@dataclass(slots=True)
+@dataclass
 class OCRResult:
     """OCR 识别结果"""
     text: str
@@ -65,7 +65,7 @@ class OCRResult:
         }
 
 
-@dataclass(slots=True)
+@dataclass
 class VisualAnalysis:
     """视觉分析结果"""
     description: str

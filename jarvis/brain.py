@@ -12,7 +12,7 @@ class BrainError(RuntimeError):
     pass
 
 
-@dataclass(slots=True)
+@dataclass
 class ChatMessage:
     role: str
     content: str

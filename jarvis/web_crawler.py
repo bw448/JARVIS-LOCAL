@@ -19,7 +19,7 @@ from urllib.parse import urljoin, urlparse
 from html.parser import HTMLParser
 
 
-@dataclass(slots=True)
+@dataclass
 class WebPage:
     """网页数据"""
     url: str
@@ -272,7 +272,7 @@ class WebCrawler:
         return links
 
 
-@dataclass(slots=True)
+@dataclass
 class CrawlResult:
     """爬取结果"""
     pages: List[WebPage]

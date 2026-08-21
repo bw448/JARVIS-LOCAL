@@ -28,7 +28,7 @@ class TaskStatus(Enum):
     CANCELLED = "cancelled"
 
 
-@dataclass(slots=True)
+@dataclass
 class TaskResult:
     """任务结果"""
     task_id: str
@@ -53,7 +53,7 @@ class TaskResult:
         }
 
 
-@dataclass(slots=True)
+@dataclass
 class Task:
     """任务定义"""
     task_id: str

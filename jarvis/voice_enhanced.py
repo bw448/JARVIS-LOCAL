@@ -29,7 +29,7 @@ class VoiceState(Enum):
     ERROR = "error"
 
 
-@dataclass(slots=True)
+@dataclass
 class VoiceConfig:
     """语音配置"""
     # 本地引擎
@@ -59,7 +59,7 @@ class VoiceConfig:
     qwen_stream_url: str = "wss://dashscope.aliyuncs.com/api-ws/v1/realtime"
 
 
-@dataclass(slots=True)
+@dataclass
 class VoiceEvent:
     """语音事件"""
     type: str  # "transcript", "audio", "state_change", "error"

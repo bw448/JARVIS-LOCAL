@@ -27,20 +27,20 @@ class SpeechError(RuntimeError):
     pass
 
 
-@dataclass(slots=True)
+@dataclass
 class AudioResult:
     data: bytes
     content_type: str = "audio/wav"
 
 
-@dataclass(slots=True)
+@dataclass
 class TranscriptionResult:
     text: str
     language: str = ""
     emotion: str = ""
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class SherpaModelFiles:
     root: Path
     family: str

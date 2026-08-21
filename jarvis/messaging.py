@@ -29,7 +29,7 @@ class MessageType(Enum):
     CARD = "card"
 
 
-@dataclass(slots=True)
+@dataclass
 class Message:
     """消息"""
     msg_id: str
@@ -55,7 +55,7 @@ class Message:
         }
 
 
-@dataclass(slots=True)
+@dataclass
 class ChatInfo:
     """聊天信息"""
     chat_id: str

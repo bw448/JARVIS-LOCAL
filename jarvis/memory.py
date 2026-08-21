@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Optional, Mapping
 from datetime import datetime
 
 
-@dataclass(slots=True)
+@dataclass
 class MemoryEntry:
     """A single memory entry."""
     id: str

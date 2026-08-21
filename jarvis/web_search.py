@@ -15,7 +15,7 @@ from urllib import error, request
 from urllib.parse import quote_plus, urlencode
 
 
-@dataclass(slots=True)
+@dataclass
 class SearchResult:
     """A single search result."""
     title: str
@@ -34,7 +34,7 @@ class SearchResult:
         }
 
 
-@dataclass(slots=True)
+@dataclass
 class SearchResponse:
     """Search response with results and metadata."""
     query: str

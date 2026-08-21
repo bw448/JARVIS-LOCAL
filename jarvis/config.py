@@ -56,14 +56,14 @@ def _http_url(value: Any, label: str, *, allow_empty: bool = False) -> str:
     return text.rstrip("/")
 
 
-@dataclass(slots=True)
+@dataclass
 class IdentityConfig:
     assistant_name: str = "JARVIS"
     owner_name: str = "先生"
     personality: str = "冷静、可靠、简洁，在需要时主动提醒风险。"
 
 
-@dataclass(slots=True)
+@dataclass
 class BrainConfig:
     provider: str = "openai_compatible"
     base_url: str = "http://127.0.0.1:8080/v1"
@@ -72,7 +72,7 @@ class BrainConfig:
     timeout_seconds: int = 120
 
 
-@dataclass(slots=True)
+@dataclass
 class DeepSeekHarnessConfig:
     """Configuration for DeepSeek Harness integration.
     
@@ -107,7 +107,7 @@ class DeepSeekHarnessConfig:
     env_overrides: Dict[str, str] = field(default_factory=dict)
 
 
-@dataclass(slots=True)
+@dataclass
 class TTSConfig:
     provider: str = DEFAULT_TTS_PROVIDER
     voice: str = DEFAULT_TTS_VOICE
@@ -121,7 +121,7 @@ class TTSConfig:
     auto_speak: bool = True
 
 
-@dataclass(slots=True)
+@dataclass
 class STTConfig:
     provider: str = "faster_whisper"
     model: str = "small"
@@ -132,13 +132,13 @@ class STTConfig:
     recording_seconds: int = 45
 
 
-@dataclass(slots=True)
+@dataclass
 class PrivacyConfig:
     save_conversations: bool = False
     diagnostic_logging: bool = False
 
 
-@dataclass(slots=True)
+@dataclass
 class AppearanceConfig:
     theme: str = "cyan"
     panel_opacity: float = 0.68
@@ -146,7 +146,7 @@ class AppearanceConfig:
     floating_window: bool = True
 
 
-@dataclass(slots=True)
+@dataclass
 class InteractionConfig:
     voice_mode_auto_start: bool = False
     proactive_speech: bool = True
@@ -156,7 +156,7 @@ class InteractionConfig:
     computer_control_enabled: bool = False
 
 
-@dataclass(slots=True)
+@dataclass
 class Settings:
     version: int = SETTINGS_VERSION
     identity: IdentityConfig = field(default_factory=IdentityConfig)

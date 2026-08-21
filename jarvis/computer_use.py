@@ -23,7 +23,7 @@ class ComputerUseError(RuntimeError):
     pass
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class ToolDefinition:
     name: str
     title: str
@@ -43,7 +43,7 @@ class ToolDefinition:
         }
 
 
-@dataclass(slots=True)
+@dataclass
 class PendingAction:
     proposal_id: str
     tool_name: str

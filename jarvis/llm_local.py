@@ -25,7 +25,7 @@ class LLMProvider(Enum):
     OPENAI_COMPATIBLE = "openai_compatible"
 
 
-@dataclass(slots=True)
+@dataclass
 class LLMConfig:
     """LLM 配置"""
     provider: LLMProvider = LLMProvider.OPENAI_COMPATIBLE
@@ -47,7 +47,7 @@ class LLMConfig:
     ollama_model: str = "llama2"
 
 
-@dataclass(slots=True)
+@dataclass
 class LLMStatus:
     """LLM 状态"""
     provider: str

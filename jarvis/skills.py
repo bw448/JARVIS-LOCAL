@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Mapping
 
 
-@dataclass(slots=True)
+@dataclass
 class SkillMetadata:
     """Skill metadata from SKILL.md frontmatter."""
     name: str
@@ -37,7 +37,7 @@ class SkillMetadata:
         }
 
 
-@dataclass(slots=True)
+@dataclass
 class Skill:
     """A loaded skill with metadata and content."""
     metadata: SkillMetadata

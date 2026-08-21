@@ -27,7 +27,7 @@ class CanvasType(Enum):
     TERMINAL = "terminal"
 
 
-@dataclass(slots=True)
+@dataclass
 class CanvasItem:
     """画布项目"""
     item_id: str
@@ -50,7 +50,7 @@ class CanvasItem:
         }
 
 
-@dataclass(slots=True)
+@dataclass
 class CanvasState:
     """画布状态"""
     items: List[CanvasItem] = field(default_factory=list)
