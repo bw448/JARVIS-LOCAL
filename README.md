@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/bw448/JARVIS-LOCAL/main/assets/jarvis-app-icon-3d-v3.png" width="160" alt="JARVIS LOCAL Logo">
+<img src="assets/jarvis-app-icon-3d-v3.png" width="160" alt="JARVIS LOCAL Logo">
 
 # JARVIS LOCAL
 
@@ -30,13 +30,13 @@
 
 **主界面 — 深色科技风 HUD**
 
-![主界面](https://raw.githubusercontent.com/bw448/JARVIS-LOCAL/main/assets/ui-preview.png)
+![主界面](assets/ui-preview.png)
 
 <br>
 
 **语音模式 — 沉浸式语音交互**
 
-![语音模式](https://raw.githubusercontent.com/bw448/JARVIS-LOCAL/main/assets/voice-mode-preview.png)
+![语音模式](assets/voice-mode-preview.png)
 
 </div>
 
